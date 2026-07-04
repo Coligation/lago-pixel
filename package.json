@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Jogo de pescaria 2D multiplayer no navegador, inspirado no mundo Fish! do VRChat",
   "main": "server.js",
+  "engines": { "node": ">=18" },
   "scripts": {
     "start": "node server.js"
   },

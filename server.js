@@ -331,11 +331,69 @@ let saveDirty = false;
 function saveProfiles() {
   if (!saveDirty) return;
   saveDirty = false;
+  ghDirty = true; // marca pro backup no GitHub também
   fs.writeFile(SAVE_FILE, JSON.stringify(profiles), (err) => {
     if (err) console.error('Erro ao salvar:', err.message);
   });
 }
 setInterval(saveProfiles, 10000);
+
+// ---------------------------------------------------------------- backup no GitHub
+// em hosts de disco efêmero (Render free), o progresso sobrevive num repo privado:
+// carrega ao iniciar, salva a cada 3 min e no desligamento (SIGTERM do deploy)
+
+const GH_TOKEN = process.env.GH_TOKEN || null;
+const GH_REPO = process.env.GH_SAVES_REPO || null; // ex: "usuario/lago-pixel-saves"
+let ghSha = null, ghBusy = false, ghDirty = false;
+
+function ghApi(method, urlPath, body) {
+  return fetch(`https://api.github.com${urlPath}`, {
+    method,
+    headers: { 'Authorization': `Bearer ${GH_TOKEN}`, 'Accept': 'application/vnd.github+json',
+      'User-Agent': 'lago-pixel-server' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+}
+
+async function ghLoad() {
+  if (!GH_TOKEN || !GH_REPO) return;
+  try {
+    const res = await ghApi('GET', `/repos/${GH_REPO}/contents/players.json`);
+    if (res.status === 404) { console.log('💾 GitHub: nenhum save ainda (primeiro boot).'); return; }
+    if (!res.ok) { console.error('💾 GitHub: falha ao carregar saves:', res.status); return; }
+    const j = await res.json();
+    ghSha = j.sha;
+    const data = JSON.parse(Buffer.from(j.content, 'base64').toString('utf8'));
+    if (data && typeof data === 'object') {
+      profiles = data;
+      console.log(`💾 GitHub: ${Object.keys(profiles).length} jogador(es) restaurado(s).`);
+    }
+  } catch (e) { console.error('💾 GitHub: erro ao carregar:', e.message); }
+}
+
+async function ghBackup() {
+  if (!GH_TOKEN || !GH_REPO || ghBusy || !ghDirty) return;
+  ghBusy = true; ghDirty = false;
+  try {
+    const body = {
+      message: `backup — ${Object.keys(profiles).length} jogador(es)`,
+      content: Buffer.from(JSON.stringify(profiles)).toString('base64'),
+    };
+    if (ghSha) body.sha = ghSha;
+    let res = await ghApi('PUT', `/repos/${GH_REPO}/contents/players.json`, body);
+    if (res.status === 409 || res.status === 422) { // sha desatualizado → busca e tenta 1x
+      const cur = await ghApi('GET', `/repos/${GH_REPO}/contents/players.json`);
+      if (cur.ok) {
+        body.sha = (await cur.json()).sha;
+        res = await ghApi('PUT', `/repos/${GH_REPO}/contents/players.json`, body);
+      }
+    }
+    if (res.ok) ghSha = (await res.json()).content.sha;
+    else { console.error('💾 GitHub: backup falhou:', res.status); ghDirty = true; }
+  } catch (e) { console.error('💾 GitHub: erro no backup:', e.message); ghDirty = true; }
+  ghBusy = false;
+}
+setInterval(ghBackup, 3 * 60 * 1000);
 
 function getProfile(name) {
   const p = profiles[name] || {};
@@ -818,9 +876,20 @@ wss.on('connection', (ws) => {
   });
 });
 
-process.on('SIGINT', () => { saveDirty = true; saveProfiles(); setTimeout(() => process.exit(0), 200); });
+async function shutdown() {
+  saveDirty = true;
+  saveProfiles();
+  ghDirty = true;
+  await ghBackup(); // salva no GitHub antes de morrer (deploys enviam SIGTERM)
+  process.exit(0);
+}
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
 
-httpServer.listen(PORT, () => console.log(`🎣 Lago Pixel v2 em http://localhost:${PORT}`));
+(async () => {
+  await ghLoad(); // restaura os saves ANTES de aceitar jogadores
+  httpServer.listen(PORT, () => console.log(`🎣 Lago Pixel v2 em http://localhost:${PORT}`));
+})();
 
 // no plano free do Render a instância hiberna após 15 min sem tráfego;
 // o auto-ping pela URL pública (via edge) mantém o jogo sempre acordado
