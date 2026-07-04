@@ -1,0 +1,12 @@
+# Deploy 1-clique no Render (https://render.com — plano gratuito)
+# No painel do Render: New + → Blueprint → conecte este repositório.
+services:
+  - type: web
+    name: lago-pixel
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: GM_PASS
+        sync: false # defina a senha de GM no painel do Render

@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Lago Pixel 🎣</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #101820; color: #eee; font-family: 'Segoe UI', system-ui, sans-serif;
+    display: flex; align-items: center; justify-content: center; min-height: 100vh;
+    overflow: hidden; user-select: none;
+  }
+  #wrap { position: relative; width: min(100vw, 178vh); aspect-ratio: 960/540; }
+  canvas#game { width: 100%; height: 100%; display: block; image-rendering: pixelated; border-radius: 8px; }
+
+  .panel {
+    position: absolute; background: rgba(12, 20, 30, .9); border: 1px solid #3a5a7a;
+    border-radius: 10px; padding: 10px 14px; backdrop-filter: blur(3px);
+  }
+
+  #hud { top: 10px; left: 10px; min-width: 185px; font-size: 13px; }
+  #hud .name { font-weight: 700; font-size: 15px; }
+  #hud .coins { color: #ffd24a; font-weight: 700; }
+  #xpbar { height: 7px; background: #223; border-radius: 4px; margin-top: 5px; overflow: hidden; }
+  #xpfill { height: 100%; width: 0; background: linear-gradient(90deg, #4ac0ff, #7affc8); transition: width .3s; }
+  #hud .sub { color: #9fc5e8; font-size: 11.5px; margin-top: 3px; }
+
+  #zonelabel { top: 10px; left: 50%; transform: translateX(-50%); font-size: 14px; font-weight: 700;
+    padding: 5px 18px; position: absolute; color: #ffe9a0; pointer-events: none; }
+
+  #announces { top: 44px; left: 50%; transform: translateX(-50%); width: 480px; max-width: 60%;
+    pointer-events: none; display: flex; flex-direction: column; gap: 4px; align-items: center; position: absolute; }
+  .announce { background: rgba(12,20,30,.85); border-radius: 8px; padding: 4px 14px; font-size: 12.5px;
+    border: 1px solid #3a5a7a; animation: fadein .3s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  @keyframes fadein { from { opacity: 0; transform: translateY(-8px); } }
+
+  #hint { bottom: 8px; left: 50%; transform: translateX(-50%); font-size: 11.5px; color: #bcd;
+    background: rgba(12,20,30,.72); padding: 4px 12px; border-radius: 8px; position: absolute; white-space: nowrap; }
+
+  #toast { top: 30%; left: 50%; transform: translate(-50%, -50%); font-size: 16px; font-weight: 600;
+    text-align: center; padding: 12px 24px; display: none; position: absolute; border-width: 2px; z-index: 8; }
+
+  #minimap { position: absolute; top: 10px; right: 10px; border: 1px solid #3a5a7a; border-radius: 8px;
+    image-rendering: pixelated; opacity: .92; width: 160px; }
+
+  #money { position: absolute; right: 12px; bottom: 12px; text-align: right; padding: 8px 22px 8px 14px; }
+  #money .val { font-size: 20px; font-weight: 800; color: #ffd24a; }
+  #money .goal { font-size: 11px; color: #9fc5e8; margin-top: 2px; }
+  #money .mclose { position: absolute; top: 2px; right: 6px; font-size: 11px; color: #9ab;
+    cursor: pointer; padding: 2px 4px; }
+  #money .mclose:hover { color: #fff; }
+  body.touch #money { right: 14px; bottom: 362px; padding: 6px 20px 6px 10px; }
+  body.touch #money .val { font-size: 15px; }
+  body.touch #money .goal { font-size: 10px; }
+
+  #btn-settings { position: absolute; top: 140px; right: 10px; width: 34px; height: 34px;
+    border-radius: 50%; background: rgba(12,20,32,.6); border: 1px solid #3a5a7a;
+    display: flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer; z-index: 4; }
+  #settings .btn { margin-top: 8px; }
+
+  #chatbox { bottom: 8px; left: 10px; width: 290px; font-size: 12.5px; max-width: 40%; }
+  #chatlog { max-height: 110px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; margin-bottom: 5px; }
+  #chatlog .line b { color: #8fd0ff; }
+  #chatinput { width: 100%; background: #0a1420; color: #eee; border: 1px solid #3a5a7a;
+    border-radius: 6px; padding: 5px 8px; font-size: 13px; display: none; }
+
+  .modal { top: 50%; left: 50%; transform: translate(-50%, -50%); width: 500px; max-width: 92%;
+    max-height: 84%; overflow-y: auto; display: none; z-index: 5; }
+  .modal h2 { font-size: 16px; margin-bottom: 8px; color: #9fd6ff; }
+  .modal h3 { font-size: 13.5px; margin: 10px 0 4px; color: #9fd6ff; }
+
+  .fishrow { display: flex; justify-content: space-between; align-items: center; padding: 4px 6px;
+    border-radius: 6px; font-size: 12.5px; gap: 6px; }
+  .fishrow:nth-child(odd) { background: rgba(255,255,255,.04); }
+  .btn { background: #1d5a8a; border: none; color: #fff; padding: 6px 12px; border-radius: 7px;
+    cursor: pointer; font-size: 12.5px; }
+  .btn:hover { background: #2a76b0; }
+  .btn:disabled { background: #444; cursor: default; }
+  .btn.small { padding: 3px 9px; font-size: 11px; }
+  .shopitem { display: flex; justify-content: space-between; align-items: center; padding: 6px 4px;
+    border-bottom: 1px solid #223a50; font-size: 12.5px; gap: 8px; }
+  .shopitem .desc { color: #9ab; font-size: 11px; }
+  .owned { color: #7affc8; font-size: 11.5px; }
+
+  /* coleção */
+  .dexgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+  .dexitem { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 6px;
+    background: rgba(255,255,255,.04); font-size: 11.5px; }
+  .dexitem canvas { image-rendering: pixelated; flex-shrink: 0; }
+  .dexitem .nm { font-weight: 600; }
+  .dexitem .st { color: #9ab; font-size: 10.5px; }
+
+  /* missões */
+  .questitem { padding: 7px 6px; border-bottom: 1px solid #223a50; font-size: 12.5px; }
+  .questitem .npc { color: #ffd24a; font-weight: 700; }
+  .questitem .prog { color: #7affc8; }
+  .questbar { height: 5px; background: #223; border-radius: 3px; margin-top: 4px; overflow: hidden; }
+  .questbar div { height: 100%; background: #7affc8; }
+
+  /* diálogo NPC */
+  #dialog { bottom: 60px; left: 50%; transform: translateX(-50%); width: 480px; max-width: 86%;
+    display: none; z-index: 6; border-width: 2px; }
+  #dialog .npc { color: #ffd24a; font-weight: 700; margin-bottom: 4px; }
+  #dialog .txt { font-size: 13.5px; white-space: pre-line; }
+  #dialog .close { color: #9ab; font-size: 11px; margin-top: 6px; }
+
+  #login { position: absolute; inset: 0; background: rgba(6,10,16,.94); display: flex;
+    align-items: center; justify-content: center; z-index: 10; border-radius: 8px; }
+  #login .box { text-align: center; }
+  #login h1 { font-size: 34px; margin-bottom: 4px; }
+  #login p { color: #9ab; margin-bottom: 18px; font-size: 13.5px; }
+  #login input { background: #0a1420; color: #eee; border: 1px solid #3a5a7a; border-radius: 8px;
+    padding: 10px 14px; font-size: 16px; text-align: center; width: 240px; }
+  #login .btn { font-size: 15px; padding: 10px 26px; margin-top: 14px; }
+
+  ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-thumb { background: #3a5a7a; border-radius: 3px; }
+
+  /* ---------- controles de toque (só aparecem em celular/tablet) ---------- */
+  #touchui { display: none; }
+  body.touch #touchui { display: block; }
+  body.touch #hint { display: none; }
+  body.touch #chatbox { display: none; }
+  body.touch #chatbox.open { display: block; }
+  #wrap, canvas { touch-action: none; }
+
+  #joyzone { position: fixed; left: 0; bottom: 0; width: 45vw; height: 55vh; z-index: 20; }
+  #joybase, #joyknob { position: fixed; display: none; z-index: 21; pointer-events: none; border-radius: 50%; }
+  #joybase { width: 88px; height: 88px; border: 2px solid rgba(255,255,255,.25); background: rgba(255,255,255,.06); }
+  #joyknob { width: 40px; height: 40px; background: rgba(255,255,255,.3); border: 1px solid rgba(255,255,255,.4); }
+
+  .tbtn { position: fixed; z-index: 20; display: flex; align-items: center; justify-content: center;
+    border-radius: 50%; background: rgba(12,20,32,.42); border: 1.5px solid rgba(255,255,255,.28);
+    color: #fff; font-size: 20px; -webkit-tap-highlight-color: transparent; }
+  .tbtn:active { background: rgba(60,130,190,.55); }
+  #btn-fish { right: 18px; bottom: 22px; width: 74px; height: 74px; font-size: 34px; }
+  #btn-e { right: 104px; bottom: 44px; width: 54px; height: 54px; font-size: 15px; font-weight: 700; }
+  .tbtn.mini { width: 40px; height: 40px; font-size: 17px; right: 14px; }
+  #btn-turbo { bottom: 308px; }
+  #btn-turbo.on { background: rgba(60,190,120,.6); }
+  #btn-inv   { bottom: 260px; }
+  #btn-dex   { bottom: 212px; }
+  #btn-quest { bottom: 164px; }
+  #btn-bait  { bottom: 116px; }
+  #btn-chat  { left: 14px; top: 110px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game" width="960" height="540"></canvas>
+  <canvas id="minimap" width="100" height="75"></canvas>
+
+  <div id="hud" class="panel">
+    <div class="name">—</div>
+    <div style="font-size:13px">Nível <span id="hud-level">1</span> · <span class="coins"><span id="hud-coins">0</span> 🪙</span></div>
+    <div id="xpbar"><div id="xpfill"></div></div>
+    <div class="sub" id="hud-gear">🎣 — · 🧵 —</div>
+    <div class="sub" id="hud-boat">🚣 sem barco</div>
+    <div class="sub" id="hud-bait">Isca: nenhuma</div>
+    <div class="sub">🐟 <span id="hud-bucket">0</span>/40 no balde</div>
+  </div>
+
+  <div id="zonelabel" class="panel"></div>
+  <div id="announces"></div>
+  <div id="toast" class="panel"></div>
+  <div id="hint">WASD/setas mover · ESPAÇO pescar · E interagir/embarcar · I balde · C coleção · Q missões · B isca · ENTER chat</div>
+
+  <div id="chatbox" class="panel">
+    <div id="chatlog"></div>
+    <input id="chatinput" maxlength="120" placeholder="Digite e ENTER pra enviar...">
+  </div>
+
+  <div id="inventory" class="panel modal">
+    <h2>🪣 Seu Balde</h2>
+    <div id="invlist"></div>
+    <div style="margin-top:8px; font-size:12.5px;">Total: <b class="coins" id="invtotal">0 🪙</b> — venda com o Zé na vila. "Soltar" deixa o peixe no chão pra um amigo pegar!</div>
+  </div>
+
+  <div id="dex" class="panel modal">
+    <h2>📖 Coleção de Peixes <span id="dexcount" style="font-size:12px;color:#9ab"></span></h2>
+    <div id="dexlist"></div>
+  </div>
+
+  <div id="quests" class="panel modal">
+    <h2>📜 Missões</h2>
+    <div id="questlist"></div>
+    <div style="margin-top:8px;font-size:11.5px;color:#9ab">Fale com os moradores das ilhas (tecla E) pra aceitar e entregar missões.</div>
+    <h2 style="margin-top:14px">🏆 Conquistas</h2>
+    <div id="achvlist"></div>
+  </div>
+
+  <div id="shop" class="panel modal">
+    <h2 id="shoptitle">🏪 Barraca do Zé do Peixe</h2>
+    <div class="shopitem" id="shopsellrow">
+      <div>Vender todos os peixes <div class="desc" id="selldesc">balde vazio</div></div>
+      <button class="btn" id="sellbtn">Vender</button>
+    </div>
+    <div id="shoprods"></div>
+    <div id="shoplines"></div>
+    <div id="shopboats"></div>
+    <div id="shopbaits"></div>
+  </div>
+
+  <div id="money" class="panel">
+    <div class="mclose" id="money-x">✕</div>
+    <div class="val"><span id="money-val">0</span> 🪙</div>
+    <div class="goal" id="money-goal"></div>
+  </div>
+
+  <div class="tbtn mini" id="btn-settings" style="display:flex">⚙️</div>
+
+  <div id="settings" class="panel modal">
+    <h2>⚙️ Configurações</h2>
+    <button class="btn" id="set-sound" style="width:100%">🔊 Som: ligado</button>
+    <button class="btn" id="set-money" style="width:100%">💰 Mostrar/ocultar painel de moedas</button>
+    <button class="btn" id="set-logout" style="width:100%;background:#8a2a2a">🚪 Sair (trocar de pescador)</button>
+    <div style="margin-top:8px;font-size:11px;color:#9ab">Dica: ESC fecha qualquer janela.</div>
+  </div>
+
+  <div id="dialog" class="panel">
+    <div class="npc"></div>
+    <div class="txt"></div>
+    <div class="close">[E ou ESC pra fechar]</div>
+  </div>
+
+  <div id="touchui">
+    <div id="joyzone"></div>
+    <div id="joybase"></div><div id="joyknob"></div>
+    <div class="tbtn" id="btn-fish">🎣</div>
+    <div class="tbtn" id="btn-e">USAR</div>
+    <div class="tbtn mini" id="btn-turbo">⚡</div>
+    <div class="tbtn mini" id="btn-inv">🪣</div>
+    <div class="tbtn mini" id="btn-dex">📖</div>
+    <div class="tbtn mini" id="btn-quest">📜</div>
+    <div class="tbtn mini" id="btn-bait">🪱</div>
+    <div class="tbtn mini" id="btn-chat">💬</div>
+  </div>
+
+  <div id="login">
+    <div class="box">
+      <h1>🎣 Lago Pixel</h1>
+      <p>explore o arquipélago, pesque lendas, complete missões</p>
+      <input id="login-name" maxlength="16" placeholder="Seu nome de pescador">
+      <br><button class="btn" id="login-btn">Zarpar!</button>
+    </div>
+  </div>
+</div>
+<script src="world.js?v=3"></script>
+<script src="game.js?v=3"></script>
+</body>
+</html>
