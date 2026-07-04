@@ -1044,8 +1044,8 @@ let critterT = 0;
 
 function updateCritters(dt, camX, camY) {
   critterT -= dt;
-  if (critterT <= 0 && critters.length < 7) {
-    critterT = 1.6;
+  if (critterT <= 0 && critters.length < 4) { // metade da fauna
+    critterT = 2.4;
     const x = camX - 60 + Math.random() * (VW + 120);
     const y = camY - 40 + Math.random() * (VH + 80);
     const t = tileAtPx(x, y);

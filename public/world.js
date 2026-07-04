@@ -203,22 +203,39 @@
   // ---- passeio dos NPCs: determinístico pelo relógio → todos os clientes e o
   // servidor calculam a MESMA posição sem trocar mensagens
 
+  // trajeto em linha reta 100% andável? (amostra a cada 4px — nada de NPC na água)
+  function lineWalkable(map, x0, y0, x1, y1) {
+    const d = Math.hypot(x1 - x0, y1 - y0);
+    const n = Math.ceil(d / 4) + 1;
+    for (let i = 0; i <= n; i++) {
+      const x = x0 + (x1 - x0) * i / n, y = y0 + (y1 - y0) * i / n;
+      const t = map[Math.floor(y / TILE) * W + Math.floor(x / TILE)];
+      if (!WALK_OK.has(t)) return false;
+    }
+    return true;
+  }
+
   function npcWalkables(map, npc, radius = 4) {
+    const hx = npc.tx * TILE + 8, hy = npc.ty * TILE + 8;
     const list = [];
     for (let dy = -radius; dy <= radius; dy++) for (let dx = -radius; dx <= radius; dx++) {
       const tx = npc.tx + dx, ty = npc.ty + dy;
       if (tx < 0 || ty < 0 || tx >= W || ty >= H) continue;
-      if (WALK_OK.has(map[ty * W + tx])) list.push([tx * TILE + 8, ty * TILE + 8]);
+      if (!WALK_OK.has(map[ty * W + tx])) continue;
+      const px = tx * TILE + 8, py = ty * TILE + 8;
+      if (lineWalkable(map, hx, hy, px, py)) list.push([px, py]); // só destinos com caminho livre
     }
-    if (!list.length) list.push([npc.tx * TILE + 8, npc.ty * TILE + 8]);
+    if (!list.length) list.push([hx, hy]);
     return list;
   }
 
   function npcPosAt(spots, npc, tms) {
-    if (npc.role !== 'quest') return { x: npc.tx * TILE + 8, y: npc.ty * TILE + 8, moving: false, dir: 'down' };
-    const period = 9000; // anda um trecho, para, observa, anda de novo
+    const hx = npc.tx * TILE + 8, hy = npc.ty * TILE + 8;
+    if (npc.role !== 'quest') return { x: hx, y: hy, moving: false, dir: 'down' };
+    const period = 9000; // sai de casa, observa, volta — sempre por linha verificada
     const seg = Math.floor(tms / period);
-    const pick = (s) => spots[(h2(npc.tx * 13 + s * 7, npc.ty * 11 + s * 3) * spots.length) | 0];
+    const pick = (s) => s % 2 === 0 ? [hx, hy]
+      : spots[(h2(npc.tx * 13 + s * 7, npc.ty * 11 + s * 3) * spots.length) | 0];
     const [x0, y0] = pick(seg), [x1, y1] = pick(seg + 1);
     const f = (tms % period) / period;
     const k = Math.min(1, f / 0.35);
