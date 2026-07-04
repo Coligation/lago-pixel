@@ -821,3 +821,12 @@ wss.on('connection', (ws) => {
 process.on('SIGINT', () => { saveDirty = true; saveProfiles(); setTimeout(() => process.exit(0), 200); });
 
 httpServer.listen(PORT, () => console.log(`🎣 Lago Pixel v2 em http://localhost:${PORT}`));
+
+// no plano free do Render a instância hiberna após 15 min sem tráfego;
+// o auto-ping pela URL pública (via edge) mantém o jogo sempre acordado
+if (process.env.RENDER_EXTERNAL_URL) {
+  const https = require('https');
+  setInterval(() => {
+    https.get(process.env.RENDER_EXTERNAL_URL, (res) => res.resume()).on('error', () => {});
+  }, 10 * 60 * 1000);
+}
