@@ -802,6 +802,57 @@ if (IS_TOUCH) {
   });
 }
 
+// ---------------------------------------------------------------- controle (gamepad)
+// analógico esq./D-pad move · A pesca (segura no minigame) · B interage/fecha
+// X balde · Y missões · LB coleção · RB isca · Start config · RT/L3 turbo
+
+let gpPrev = [], gpVec = { x: 0, y: 0 }, gpSprint = false, gpA = false;
+addEventListener('gamepadconnected', (e) => {
+  toast(`🎮 Controle conectado: ${e.gamepad.id.slice(0, 34)}`, 3000);
+});
+addEventListener('gamepaddisconnected', () => {
+  gpVec.x = gpVec.y = 0; gpSprint = false; gpA = false;
+  toast('🎮 Controle desconectado');
+});
+
+function anyModalOpen() {
+  return ['inventory', 'shop', 'dex', 'quests', 'settings'].some(id => $(id).style.display === 'block')
+    || $('dialog').style.display === 'block';
+}
+
+function pollGamepad() {
+  if (!navigator.getGamepads) return;
+  let gp = null;
+  for (const p of navigator.getGamepads()) if (p && p.connected) { gp = p; break; }
+  if (!gp) { gpVec.x = gpVec.y = 0; gpSprint = false; gpA = false; return; }
+
+  const pr = (i) => !!(gp.buttons[i] && gp.buttons[i].pressed);
+  const tap = (i) => pr(i) && !gpPrev[i];
+
+  // movimento: analógico esquerdo + D-pad (12-15)
+  let x = gp.axes[0] || 0, y = gp.axes[1] || 0;
+  if (Math.hypot(x, y) < 0.25) { x = 0; y = 0; }
+  if (pr(14)) x = -1; if (pr(15)) x = 1;
+  if (pr(12)) y = -1; if (pr(13)) y = 1;
+  gpVec.x = x; gpVec.y = y;
+
+  gpSprint = (gp.buttons[7] && gp.buttons[7].value > 0.5) || pr(10); // RT ou L3
+  gpA = pr(0); // segurar A = segurar ESPAÇO no minigame
+
+  if (tap(0) && !reel && !chatOpen) {
+    if (fish.phase === 'idle') tryCast();
+    else send({ type: 'hook' });
+  }
+  if (tap(1)) { if (anyModalOpen()) closeModals(); else interact(); }
+  if (tap(2)) togglePanel('inventory');
+  if (tap(3)) togglePanel('quests');
+  if (tap(4)) togglePanel('dex');
+  if (tap(5)) cycleBait();
+  if (tap(9)) togglePanel('settings');
+
+  gpPrev = gp.buttons.map(b => b.pressed);
+}
+
 $('login-name').value = localStorage.getItem('lp_name') || '';
 $('login-btn').onclick = doLogin;
 $('login-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
@@ -842,6 +893,10 @@ function updateMe(dt) {
     vx = joy.vx; vy = joy.vy;
     me.dir = Math.abs(vx) > Math.abs(vy) ? (vx < 0 ? 'left' : 'right') : (vy < 0 ? 'up' : 'down');
   }
+  if (!vx && !vy && (gpVec.x || gpVec.y)) { // controle (gamepad)
+    vx = gpVec.x; vy = gpVec.y;
+    me.dir = Math.abs(vx) > Math.abs(vy) ? (vx < 0 ? 'left' : 'right') : (vy < 0 ? 'up' : 'down');
+  }
 
   const moving = vx !== 0 || vy !== 0;
   me.moving = moving;
@@ -850,7 +905,7 @@ function updateMe(dt) {
     // mapa grande: barcos bem mais rápidos que a pé
     let spd = me.boat ? (catalog.boats[profile.boat] ? 150 * catalog.boats[profile.boat].speed + 40 : 190) : 100;
     // SHIFT: corrida a pé; turbo só em barco moderno (lancha/veleiro)
-    const sprint = keys['ShiftLeft'] || keys['ShiftRight'] || touchTurbo;
+    const sprint = keys['ShiftLeft'] || keys['ShiftRight'] || touchTurbo || gpSprint;
     let turbo = false;
     if (sprint) {
       if (!me.boat) spd *= 1.5;
@@ -911,7 +966,7 @@ function updateReel(dt) {
   r.fishPos += r.fishVel * dt;
   if (r.fishPos < 0) { r.fishPos = 0; r.fishVel = Math.abs(r.fishVel); }
   if (r.fishPos > 1) { r.fishPos = 1; r.fishVel = -Math.abs(r.fishVel); }
-  const hold = keys['Space'];
+  const hold = keys['Space'] || gpA;
   r.zoneVel += (hold ? 2.6 : -2.6) * dt;
   r.zoneVel *= 0.92;
   r.zonePos += r.zoneVel * dt;
@@ -1896,6 +1951,7 @@ function loop(now) {
   const time = now / 1000;
 
   if (profile) {
+    if (!chatOpen) pollGamepad();
     updateMe(dt);
     if (reel) updateReel(dt);
     for (const p of others.values()) {
