@@ -1831,12 +1831,11 @@ function charColors(name, hue) {
 }
 
 // sprite 24x30 estilo Alundra: cabeça grande, 3 tons de sombra, contorno forte — pés em (12, 29)
-function buildCharSprite(c, dir, frame, fishing) {
-  const tmp = mkCanvas(24, 30);
-  const g = tmp.getContext('2d');
+// frente/costas têm um desenho; esquerda/direita têm PERFIL de verdade (corpo virado)
+
+function drawCharFrontal(g, c, dir, frame, fishing) {
   const legL = frame === 1 ? -1 : frame === 2 ? 1 : 0;
   const skinD = 'rgba(120,60,30,.35)';
-
   // pernas com botas
   g.fillStyle = c.pants;
   g.fillRect(7, 22 + Math.min(0, legL), 4, 6 - Math.min(0, legL));
@@ -1845,67 +1844,114 @@ function buildCharSprite(c, dir, frame, fishing) {
   g.fillRect(7, 27 + (legL < 0 ? -1 : 0), 4, 2.5); g.fillRect(13, 27 + (legL > 0 ? -1 : 0), 4, 2.5);
   g.fillStyle = '#6b4c28';
   g.fillRect(7, 27 + (legL < 0 ? -1 : 0), 4, 1); g.fillRect(13, 27 + (legL > 0 ? -1 : 0), 4, 1);
-
-  // túnica com cinto e sombreamento (luz vindo da esquerda-cima)
+  // túnica com cinto
   g.fillStyle = c.shirt; g.fillRect(6, 13, 12, 10);
-  g.fillStyle = c.shirtD; g.fillRect(15, 13, 3, 10);          // lado escuro
-  g.fillStyle = 'rgba(255,255,255,.28)'; g.fillRect(6, 13, 2, 9); // lado claro
-  g.fillStyle = '#4a3418'; g.fillRect(6, 20, 12, 2);           // cinto
-  g.fillStyle = '#ffd24a'; g.fillRect(11, 20, 2, 2);           // fivela
-  g.fillStyle = c.shirtD; g.fillRect(6, 22, 12, 1);            // barra da túnica
-
-  // braços
+  g.fillStyle = c.shirtD; g.fillRect(15, 13, 3, 10);
+  g.fillStyle = 'rgba(255,255,255,.28)'; g.fillRect(6, 13, 2, 9);
+  g.fillStyle = '#4a3418'; g.fillRect(6, 20, 12, 2);
+  g.fillStyle = '#ffd24a'; g.fillRect(11, 20, 2, 2);
+  g.fillStyle = c.shirtD; g.fillRect(6, 22, 12, 1);
+  // braços (os dois visíveis)
   g.fillStyle = c.skin;
-  if (fishing) {
-    if (dir === 'left') { g.fillRect(2, 14, 5, 4); g.fillStyle = skinD; g.fillRect(2, 16, 5, 1); }
-    else if (dir === 'right') { g.fillRect(17, 14, 5, 4); g.fillStyle = skinD; g.fillRect(17, 16, 5, 1); }
-    else { g.fillRect(3, 14, 3, 5); g.fillRect(18, 14, 3, 5); }
-  } else {
+  if (fishing) { g.fillRect(3, 14, 3, 5); g.fillRect(18, 14, 3, 5); }
+  else {
     const sw = frame === 1 ? 1 : frame === 2 ? -1 : 0;
-    if (dir !== 'right') { g.fillRect(4, 14 + sw, 3, 7); g.fillStyle = c.shirt; g.fillRect(4, 14 + sw, 3, 3); g.fillStyle = c.skin; }
-    if (dir !== 'left') { g.fillRect(17, 14 - sw, 3, 7); g.fillStyle = c.shirtD; g.fillRect(17, 14 - sw, 3, 3); g.fillStyle = c.skin; }
+    g.fillRect(4, 14 + sw, 3, 7); g.fillStyle = c.shirt; g.fillRect(4, 14 + sw, 3, 3);
+    g.fillStyle = c.skin;
+    g.fillRect(17, 14 - sw, 3, 7); g.fillStyle = c.shirtD; g.fillRect(17, 14 - sw, 3, 3);
+    g.fillStyle = c.skin;
   }
-
-  // cabeça grande e expressiva
+  // cabeça
   g.fillStyle = c.skin; g.fillRect(6, 4, 12, 10);
-  g.fillStyle = skinD; g.fillRect(16, 5, 2, 8); // sombra lateral do rosto
-  // cabelo
+  g.fillStyle = skinD; g.fillRect(16, 5, 2, 8);
   g.fillStyle = c.hair;
   if (dir === 'up') g.fillRect(6, 4, 12, 7);
   else {
     g.fillRect(6, 4, 12, 2.5);
     g.fillRect(6, 4, 2.5, 6); g.fillRect(15.5, 4, 2.5, 6);
-    g.fillRect(9, 6, 2, 1.5); g.fillRect(13, 6, 1.5, 1); // franja irregular
+    g.fillRect(9, 6, 2, 1.5); g.fillRect(13, 6, 1.5, 1);
   }
-  // chapéu de pescador com fita
+  // chapéu
   g.fillStyle = c.hat;
-  g.fillRect(5, 1, 14, 4);
-  g.fillRect(3.5, 4, 17, 2);
-  g.fillStyle = 'rgba(0,0,0,.3)'; g.fillRect(5, 3.6, 14, 1.4); // fita
+  g.fillRect(5, 1, 14, 4); g.fillRect(3.5, 4, 17, 2);
+  g.fillStyle = 'rgba(0,0,0,.3)'; g.fillRect(5, 3.6, 14, 1.4);
   g.fillStyle = 'rgba(255,255,255,.3)'; g.fillRect(5, 1, 14, 1);
   // rosto
-  if (dir !== 'up') {
-    const eyeY = 8.5;
-    g.fillStyle = '#241d16';
-    if (dir === 'down' || dir === 'left') g.fillRect(8, eyeY, 2, 2.5);
-    if (dir === 'down' || dir === 'right') g.fillRect(14, eyeY, 2, 2.5);
-    g.fillStyle = '#fff';
-    if (dir === 'down' || dir === 'left') g.fillRect(8, eyeY, 1, 1);
-    if (dir === 'down' || dir === 'right') g.fillRect(14, eyeY, 1, 1);
-    g.fillStyle = skinD;
-    if (dir === 'down') { g.fillRect(11, 10.5, 2, 1.5); g.fillRect(10, 12.5, 4, 1); } // nariz+boca
-    if (dir === 'left') g.fillRect(6.5, 10.5, 1.5, 1.5);
-    if (dir === 'right') g.fillRect(16, 10.5, 1.5, 1.5);
+  if (dir === 'down') {
+    g.fillStyle = '#241d16'; g.fillRect(8, 8.5, 2, 2.5); g.fillRect(14, 8.5, 2, 2.5);
+    g.fillStyle = '#fff'; g.fillRect(8, 8.5, 1, 1); g.fillRect(14, 8.5, 1, 1);
+    g.fillStyle = skinD; g.fillRect(11, 10.5, 2, 1.5); g.fillRect(10, 12.5, 4, 1);
   }
+}
 
+// perfil virado pra DIREITA (a esquerda é o espelho)
+function drawCharProfile(g, c, frame, fishing) {
+  const skinD = 'rgba(120,60,30,.35)';
+  const st = frame === 1 ? 2 : frame === 2 ? -2 : 0; // passada
+  // perna de trás (mais escura) e da frente
+  g.fillStyle = c.pants; g.fillRect(9 - st, 22, 4, 6);
+  g.fillStyle = 'rgba(0,0,0,.28)'; g.fillRect(9 - st, 22, 4, 6);
+  g.fillStyle = c.pants; g.fillRect(12 + st, 22, 4, 6);
+  g.fillStyle = '#3f2c16'; g.fillRect(8.5 - st, 27, 5, 2.5); g.fillRect(11.5 + st, 27, 5.5, 2.5);
+  g.fillStyle = '#6b4c28'; g.fillRect(8.5 - st, 27, 5, 1); g.fillRect(11.5 + st, 27, 5.5, 1);
+  // corpo de perfil (mais estreito)
+  g.fillStyle = c.shirt; g.fillRect(8, 13, 9, 10);
+  g.fillStyle = c.shirtD; g.fillRect(8, 13, 3, 10);              // costas sombreadas
+  g.fillStyle = 'rgba(255,255,255,.25)'; g.fillRect(14.5, 13, 2, 9); // peito iluminado
+  g.fillStyle = '#4a3418'; g.fillRect(8, 20, 9, 2);              // cinto
+  g.fillStyle = '#ffd24a'; g.fillRect(14, 20, 2, 2);
+  g.fillStyle = c.shirtD; g.fillRect(8, 22, 9, 1);
+  // braço único visível (o outro fica atrás do corpo)
+  if (fishing) { // estendido segurando a vara
+    g.fillStyle = c.shirt; g.fillRect(13, 14, 4, 4);
+    g.fillStyle = c.skin; g.fillRect(16.5, 14.5, 5, 3.5);
+    g.fillStyle = skinD; g.fillRect(16.5, 16.5, 5, 1);
+  } else {
+    const sw = frame === 1 ? 1.6 : frame === 2 ? -1.6 : 0;
+    g.fillStyle = c.shirt; g.fillRect(11 + sw * 0.4, 14, 3.6, 4);
+    g.fillStyle = c.skin; g.fillRect(11 + sw, 17.5, 3.4, 4.5);
+  }
+  // cabeça de perfil
+  g.fillStyle = c.skin; g.fillRect(6.5, 4, 12, 10);
+  g.fillStyle = c.skin; g.fillRect(18.5, 8.5, 1.5, 2.5); // nariz
+  g.fillStyle = skinD; g.fillRect(18.5, 10, 1.5, 1);
+  // cabelo cobrindo a nuca
+  g.fillStyle = c.hair;
+  g.fillRect(6.5, 4, 12, 2.5);
+  g.fillRect(6.5, 4, 5, 9);          // nuca
+  g.fillRect(11.5, 6, 2, 1.5);       // franja
+  // chapéu
+  g.fillStyle = c.hat;
+  g.fillRect(5.5, 1, 14, 4); g.fillRect(4, 4, 17.5, 2);
+  g.fillStyle = 'rgba(0,0,0,.3)'; g.fillRect(5.5, 3.6, 14, 1.4);
+  g.fillStyle = 'rgba(255,255,255,.3)'; g.fillRect(5.5, 1, 14, 1);
+  // olho e boca (na frente)
+  g.fillStyle = '#241d16'; g.fillRect(15.5, 8.5, 2, 2.5);
+  g.fillStyle = '#fff'; g.fillRect(15.5, 8.5, 1, 1);
+  g.fillStyle = skinD; g.fillRect(16.5, 12, 2, 1);
+}
+
+function buildCharSprite(c, dir, frame, fishing) {
+  const tmp = mkCanvas(24, 30);
+  const g = tmp.getContext('2d');
+  if (dir === 'left' || dir === 'right') drawCharProfile(g, c, frame, fishing);
+  else drawCharFrontal(g, c, dir, frame, fishing);
+  // espelha pro lado esquerdo
+  let base = tmp;
+  if (dir === 'left') {
+    base = mkCanvas(24, 30);
+    const fg = base.getContext('2d');
+    fg.translate(24, 0); fg.scale(-1, 1);
+    fg.drawImage(tmp, 0, 0);
+  }
   // contorno forte estilo PS1
   const out = mkCanvas(24, 30);
   const og = out.getContext('2d');
-  for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1]]) og.drawImage(tmp, ox, oy);
+  for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1]]) og.drawImage(base, ox, oy);
   og.globalCompositeOperation = 'source-in';
   og.fillStyle = '#241d16'; og.fillRect(0, 0, 24, 30);
   og.globalCompositeOperation = 'source-over';
-  og.drawImage(tmp, 0, 0);
+  og.drawImage(base, 0, 0);
   return out;
 }
 
@@ -2526,20 +2572,24 @@ function frame_(now) {
       if (e.kind === 'player') {
         const p = e.p;
         const pMoving = Math.hypot(p.tx - p.x, p.ty - p.y) > 1.5;
+        const rodBehind = p.dir === 'up'; // pescando pro norte, a vara fica ATRÁS do corpo
+        if (rodBehind) drawFishingRodAndLine(p, false, time, now);
         drawChar(p.x, p.y, p.dir, p.name, pMoving, time, p.boat ? (p.boatT || 'remo') : false, !!p.fishing, null, p.hue);
         if (p.sayFx && now < p.sayFx.until) drawSpeech(p.x, p.y - (p.boat ? 40 : 36), p.sayFx.text);
         else drawLabel(p.x, p.y - (p.boat ? 38 : 34), showName ? p.name : `Nível ${p.level}`, showName ? '#fff' : '#ffd88a');
-        drawFishingRodAndLine(p, false, time, now);
+        if (!rodBehind) drawFishingRodAndLine(p, false, time, now);
         if (p.catchFx) {
           const age = (now - p.catchFx.t) / 1000;
           if (age > 2.4) p.catchFx = null;
           else drawLabel(p.x, p.y - 40 - age * 10, p.catchFx.fish.name + '!', catalog.rarities[p.catchFx.fish.rarity].color);
         }
       } else {
+        const rodBehind = me.dir === 'up';
+        if (rodBehind) drawFishingRodAndLine(me, true, time, now);
         drawChar(me.x, me.y, me.dir, me.name, me.moving, time, me.boat ? (profile.boat || 'remo') : false, fish.phase !== 'idle', null, profile.color);
         if (me.sayFx && now < me.sayFx.until) drawSpeech(me.x, me.y - (me.boat ? 40 : 36), me.sayFx.text);
         else drawLabel(me.x, me.y - (me.boat ? 38 : 34), showName ? me.name : `Nível ${profile.level}`, showName ? '#bfe8ff' : '#ffd88a');
-        drawFishingRodAndLine(me, true, time, now);
+        if (!rodBehind) drawFishingRodAndLine(me, true, time, now);
       }
     }
 
