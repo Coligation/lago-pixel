@@ -28,6 +28,11 @@ for (let ty = 0; ty < H; ty++) for (let tx = 0; tx < W; tx++) {
     RENDER_MAP[ty * W + tx] = THEME_GROUND[theme];
     DECOR.push({ type: t, x: tx * TILE + 8, y: ty * TILE + 14, v: h2(tx, ty), th: theme });
   }
+  // parte da grama alta vira arbusto volumoso (estilo Alundra)
+  if ((t === T.TALL || t === T.SAVTALL) && h2(tx + 31, ty + 17) < 0.30) {
+    RENDER_MAP[ty * W + tx] = t === T.TALL ? T.GRASS : T.SAV;
+    DECOR.push({ type: 'bush', x: tx * TILE + 8, y: ty * TILE + 14, v: h2(tx, ty), th: t === T.TALL ? 'grass' : 'savanna' });
+  }
   if (t === T.FAROLBASE) RENDER_MAP[ty * W + tx] = T.STONE;
   if (t === T.KIOSK) {
     RENDER_MAP[ty * W + tx] = T.PATH;
@@ -1044,14 +1049,24 @@ function buildAtlas() {
 
   SPR[T.GRASS] = mk4((g, r) => {
     g.fillStyle = '#4fbe46'; g.fillRect(0, 0, 16, 16);
-    speck(g, r, 8, ['#5fd253', '#45ab3d', '#58c74c'], 2, 1);
-    // tufos com sombra e ponta clara
+    // manchas orgânicas mescladas (o chão do Alundra nunca é liso)
     for (let i = 0; i < 3; i++) {
-      const x = 1 + ((r() * 12) | 0), y = 3 + ((r() * 10) | 0);
-      g.fillStyle = '#2f8a30'; g.fillRect(x, y + 1, 1, 3); g.fillRect(x + 2, y + 2, 1, 2);
-      g.fillStyle = '#79e468'; g.fillRect(x, y, 1, 1); g.fillRect(x + 2, y + 1, 1, 1);
+      g.fillStyle = ['rgba(130,225,95,.35)', 'rgba(40,130,45,.32)', 'rgba(190,205,85,.20)'][(r() * 3) | 0];
+      g.beginPath(); g.ellipse(r() * 16, r() * 16, 3 + r() * 4, 2 + r() * 3, r() * 3, 0, 7); g.fill();
     }
-    if (r() > 0.82) { g.fillStyle = '#38953a'; g.fillRect((r() * 11) | 0, (r() * 11) | 0, 4, 3); }
+    speck(g, r, 6, ['#5fd253', '#43a83c'], 1, 1);
+    // tufos de 3 lâminas com sombra na base
+    for (let i = 0; i < 2; i++) {
+      const x = 2 + ((r() * 10) | 0), y = 3 + ((r() * 9) | 0);
+      g.fillStyle = 'rgba(25,80,28,.5)'; g.fillRect(x - 1, y + 4, 6, 1);
+      g.fillStyle = '#2f8a30'; g.fillRect(x, y + 1, 1, 3); g.fillRect(x + 2, y, 1, 4); g.fillRect(x + 4, y + 2, 1, 2);
+      g.fillStyle = '#8aec74'; g.fillRect(x + 2, y, 1, 1); g.fillRect(x, y + 1, 1, 1);
+    }
+    if (r() > 0.78) { // pedrinha perdida na grama
+      const px = (r() * 12) | 0, py = (r() * 12) | 0;
+      g.fillStyle = '#7c9058'; g.fillRect(px, py + 1, 3, 2);
+      g.fillStyle = '#b8c48a'; g.fillRect(px, py, 3, 1);
+    }
   });
   SPR[T.TALL] = mk4((g, r) => {
     g.fillStyle = '#3da43a'; g.fillRect(0, 0, 16, 16);
@@ -1076,15 +1091,23 @@ function buildAtlas() {
     }
   });
   SPR[T.SAND] = mk4((g, r) => {
-    g.fillStyle = '#f3dfa4'; g.fillRect(0, 0, 16, 16);
-    // ondulações de duna
-    g.strokeStyle = '#ddc17e'; g.lineWidth = 1;
-    for (let i = 0; i < 2; i++) {
-      const y = 3 + ((r() * 10) | 0);
-      g.beginPath(); g.moveTo(0, y); g.quadraticCurveTo(8, y + (r() > .5 ? 2 : -2), 16, y); g.stroke();
+    g.fillStyle = '#eed9a2'; g.fillRect(0, 0, 16, 16);
+    // manchas de terra batida (claro/escuro se mesclando)
+    for (let i = 0; i < 3; i++) {
+      g.fillStyle = ['rgba(255,244,200,.45)', 'rgba(200,165,105,.35)', 'rgba(230,205,150,.4)'][(r() * 3) | 0];
+      g.beginPath(); g.ellipse(r() * 16, r() * 16, 3 + r() * 4, 2 + r() * 2.5, r() * 3, 0, 7); g.fill();
     }
-    speck(g, r, 5, ['#fcf0c8', '#e6ca8c'], 1, 1);
-    if (r() > 0.8) { g.fillStyle = '#fffaf0'; g.fillRect(10, 10, 3, 2); g.fillStyle = '#cfa96a'; g.fillRect(11, 11, 1, 1); }
+    // grupinho de pedrinhas assentadas (marca registrada do chão do Alundra)
+    if (r() > 0.35) {
+      const px = 2 + ((r() * 9) | 0), py = 2 + ((r() * 9) | 0), n = 2 + ((r() * 3) | 0);
+      for (let i = 0; i < n; i++) {
+        const sx = px + ((r() * 6) | 0), sy = py + ((r() * 5) | 0);
+        g.fillStyle = '#a98650'; g.fillRect(sx, sy + 1, 3, 2);
+        g.fillStyle = '#d9b87e'; g.fillRect(sx, sy, 3, 1.5);
+        g.fillStyle = '#fdf2cd'; g.fillRect(sx, sy, 1, 1);
+      }
+    }
+    speck(g, r, 4, ['#f9ecc0', '#dcc188'], 1, 1);
   });
   SPR[T.SAV] = mk4((g, r) => {
     g.fillStyle = '#d8c163'; g.fillRect(0, 0, 16, 16);
@@ -1254,7 +1277,7 @@ function buildAtlas() {
 }
 buildAtlas();
 
-// classe de material por tile → contorno suave entre terrenos diferentes (estilo Alundra)
+// classe de material por tile → transições orgânicas entre terrenos (estilo Alundra)
 const MAT_CLASS = [];
 {
   const M = {};
@@ -1268,6 +1291,32 @@ const MAT_CLASS = [];
   M[T.STONE] = 10; M[T.ROCK] = 10;
   M[T.WALL] = 11; M[T.DOOR] = 11; M[T.ROOF] = 12;
   for (let i = 0; i < 32; i++) MAT_CLASS[i] = M[i] !== undefined ? M[i] : 1;
+}
+// [cor, contorno, prioridade] — o material de prioridade maior "avança" sobre o vizinho em lóbulos
+const EDGE_STYLE = {
+  1: ['#45b23e', '#2c7a2c', 9],   // grama
+  7: ['#d8c163', '#a88f3c', 8],   // savana
+  5: ['#f6fafe', '#c8d9ee', 7],   // neve
+  6: ['#bfe6f8', '#8ecbe8', 6.5], // gelo
+  8: ['#5b4a58', '#3a2d38', 6],   // vulcânico
+  10: ['#adaab8', '#7f7c8c', 5],  // pedra
+  2: ['#eed9a2', '#c8a86a', 4],   // areia
+  3: ['#d3ab77', '#9c7c4e', 3],   // caminho
+};
+function drawOrganicEdge(tx, ty, vertical, style) {
+  const [fill, dark] = style;
+  const bx = tx * TILE, by = ty * TILE;
+  for (let i = 0; i < 3; i++) {
+    const jit = h2(tx * 3 + i, ty * 5 + (vertical ? 11 : 0));
+    const off = 2.5 + i * 5.5 + (jit * 3 - 1.5);
+    const rad = 2.4 + jit * 1.5;
+    const cx2 = vertical ? bx + 16 : bx + off;
+    const cy2 = vertical ? by + off : by + 16;
+    ctx.fillStyle = dark;
+    ctx.beginPath(); ctx.arc(cx2, cy2, rad + 0.9, 0, 7); ctx.fill();
+    ctx.fillStyle = fill;
+    ctx.beginPath(); ctx.arc(cx2 - 0.5, cy2 - 0.5, rad, 0, 7); ctx.fill();
+  }
 }
 
 // ---------------------------------------------------------------- sprites: decoração
@@ -1396,6 +1445,32 @@ function drawDecor(d, time) {
       ctx.beginPath(); ctx.moveTo(d.x - 5, d.y - 4); ctx.lineTo(d.x - 1, d.y - 7); ctx.lineTo(d.x + 3, d.y - 5); ctx.lineTo(d.x - 2, d.y - 2); ctx.closePath(); ctx.fill();
       ctx.fillStyle = '#68686f'; ctx.fillRect(d.x - 1, d.y - 2, 4, 1); ctx.fillRect(d.x + 1, d.y - 1, 3, 1);
       if (d.v > 0.6) { ctx.fillStyle = '#8ca86c'; ctx.fillRect(d.x - 5, d.y - 1, 2, 2); }
+      break;
+    }
+    case 'bush': {
+      // arbusto denso com contorno e camadas (como os da referência)
+      const dry = d.th === 'savanna';
+      const [outl, base, mid, hi] = dry
+        ? ['#5c4a1c', '#8a7430', '#b09a42', '#e2cf7a']
+        : ['#1d4d20', '#2f8a30', '#45b23e', '#8aec74'];
+      const s = 0.9 + d.v * 0.35;
+      const bx = d.x + sway * 0.4, by = d.y - 3;
+      drawShadow(d.x, d.y + 1, 9 * s, 2.8);
+      const lobes = [[-4.5, -1, 4.4], [0, -3.5, 5.2], [4.5, -1, 4.4], [-2, 1, 4.2], [2.5, 1, 4.2]];
+      ctx.fillStyle = outl; // contorno
+      for (const [ox, oy, rr] of lobes) { ctx.beginPath(); ctx.arc(bx + ox * s, by + oy * s, (rr + 1.1) * s, 0, 7); ctx.fill(); }
+      ctx.fillStyle = base;
+      for (const [ox, oy, rr] of lobes) { ctx.beginPath(); ctx.arc(bx + ox * s, by + oy * s, rr * s, 0, 7); ctx.fill(); }
+      ctx.fillStyle = mid; // camada iluminada (luz de cima-esquerda)
+      for (const [ox, oy, rr] of lobes) { ctx.beginPath(); ctx.arc(bx + (ox - 0.8) * s, by + (oy - 1) * s, rr * 0.62 * s, 0, 7); ctx.fill(); }
+      ctx.fillStyle = hi; // folhinhas de brilho
+      ctx.fillRect(bx - 4 * s, by - 4 * s, 2, 1); ctx.fillRect(bx + 1 * s, by - 6 * s, 2, 1);
+      ctx.fillRect(bx - 1 * s, by - 2 * s, 1, 1); ctx.fillRect(bx + 4 * s, by - 3 * s, 1, 1);
+      if (!dry && d.v > 0.82) { // frutinhas
+        ctx.fillStyle = '#ff5a96';
+        ctx.fillRect(bx - 3, by - 1, 2, 2); ctx.fillRect(bx + 3, by - 4, 2, 2);
+        ctx.fillStyle = '#ffd0e4'; ctx.fillRect(bx - 3, by - 1, 1, 1);
+      }
       break;
     }
     case 'house': {
@@ -2153,14 +2228,27 @@ function loop(now) {
           ? (frame + ((tx * 3 + ty * 5) & 3)) & 3
           : (h2(tx, ty) * 4) | 0;
         ctx.drawImage(spr[v % spr.length], tx * TILE, ty * TILE);
+        // manchas em escala grande atravessando tiles (mata a cara de grid)
+        if (t !== T.LAVA) {
+          const patch = h2(tx >> 2, (ty >> 2) + 7);
+          if (patch < 0.28) { ctx.fillStyle = isWaterT(t) ? 'rgba(0,15,50,.07)' : 'rgba(25,45,10,.06)'; ctx.fillRect(tx * TILE, ty * TILE, TILE, TILE); }
+          else if (patch > 0.74) { ctx.fillStyle = isWaterT(t) ? 'rgba(160,220,255,.05)' : 'rgba(255,250,190,.07)'; ctx.fillRect(tx * TILE, ty * TILE, TILE, TILE); }
+        }
         if (isWaterT(t)) drawFoam(tx, ty, time);
         else {
-          // traço de tinta entre materiais diferentes (estilo Alundra)
+          // transições orgânicas: o terreno dominante "morde" o vizinho em lóbulos
           const mc = MAT_CLASS[t];
           const tr = rTileAt(tx + 1, ty), tb = rTileAt(tx, ty + 1);
-          ctx.fillStyle = 'rgba(35,25,14,.28)';
-          if (!isWaterT(tr) && MAT_CLASS[tr] !== mc) ctx.fillRect(tx * TILE + 15, ty * TILE, 1, TILE);
-          if (!isWaterT(tb) && MAT_CLASS[tb] !== mc) ctx.fillRect(tx * TILE, ty * TILE + 15, TILE, 1);
+          if (!isWaterT(tr) && MAT_CLASS[tr] !== mc) {
+            const a = EDGE_STYLE[mc], b = EDGE_STYLE[MAT_CLASS[tr]];
+            if (a && b) drawOrganicEdge(tx, ty, true, a[2] >= b[2] ? a : b);
+            else { ctx.fillStyle = 'rgba(35,25,14,.3)'; ctx.fillRect(tx * TILE + 15, ty * TILE, 1, TILE); }
+          }
+          if (!isWaterT(tb) && MAT_CLASS[tb] !== mc) {
+            const a = EDGE_STYLE[mc], b = EDGE_STYLE[MAT_CLASS[tb]];
+            if (a && b) drawOrganicEdge(tx, ty, false, a[2] >= b[2] ? a : b);
+            else { ctx.fillStyle = 'rgba(35,25,14,.3)'; ctx.fillRect(tx * TILE, ty * TILE + 15, TILE, 1); }
+          }
         }
       }
     }
