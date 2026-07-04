@@ -8,6 +8,10 @@ const ZOOM = 2;
 const VW = 480, VH = 270;
 const { W, H, TILE, T, WALK_OK, BOAT_OK, ISLANDS, NPCS, SPAWN, ZONE_NAMES, h2 } = WORLD;
 const MAP = WORLD.genWorld();
+// pontos de passeio dos NPCs (mesma conta no servidor → posições idênticas pra todos)
+const NPC_SPOTS = {};
+for (const n of NPCS) NPC_SPOTS[n.id] = WORLD.npcWalkables(MAP, n);
+const npcPos = (n) => WORLD.npcPosAt(NPC_SPOTS[n.id], n, Date.now());
 
 const tileAt = (tx, ty) => (tx < 0 || ty < 0 || tx >= W || ty >= H) ? T.DEEP : MAP[ty * W + tx];
 const tileAtPx = (px, py) => tileAt(Math.floor(px / TILE), Math.floor(py / TILE));
@@ -256,6 +260,29 @@ $('set-sound').onclick = () => {
   toggleAmbience();
   $('set-sound').textContent = ambienceOn ? '🔊 Som: ligado' : '🔇 Som: desligado';
 };
+// paleta de cores da roupa (fica salva no perfil do servidor)
+{
+  const row = $('colorrow');
+  const hues = [0, 25, 45, 90, 140, 175, 205, 235, 275, 315];
+  for (const h of hues) {
+    const sw = document.createElement('div');
+    sw.className = 'swatch';
+    sw.style.background = `hsl(${h}, 55%, 52%)`;
+    sw.onclick = () => {
+      send({ type: 'set_color', hue: h });
+      [...row.children].forEach(el => el.classList.remove('sel'));
+      sw.classList.add('sel');
+      toast('👕 Cor trocada!', 1200);
+    };
+    row.appendChild(sw);
+  }
+  const orig = document.createElement('div');
+  orig.className = 'swatch';
+  orig.style.background = 'conic-gradient(red, yellow, lime, cyan, blue, magenta, red)';
+  orig.title = 'Cor original (pelo nome)';
+  orig.onclick = () => { send({ type: 'set_color', hue: null }); toast('👕 Cor original!', 1200); };
+  row.appendChild(orig);
+}
 $('set-money').onclick = () => {
   const el = $('money');
   const hidden = el.style.display === 'none';
@@ -679,7 +706,8 @@ function interact() {
   if (nearest) { send({ type: 'pickup', id: nearest.id }); return; }
 
   for (const n of NPCS) {
-    if (Math.hypot(n.tx * TILE + 8 - me.x, n.ty * TILE + 8 - me.y) < 40) {
+    const np = npcPos(n);
+    if (Math.hypot(np.x - me.x, np.y - me.y) < 42) {
       send({ type: 'talk', npc: n.id });
       return;
     }
@@ -1003,6 +1031,137 @@ function wake(x, y) {
   amb.push({ kind: 'wake', x: x + (Math.random() * 8 - 4), y: y + 4 + Math.random() * 3, vx: 0, vy: 2, life: 1, max: 1 });
 }
 
+// ---------------------------------------------------------------- bichinhos
+// fauna ambiente por bioma: coelhos/esquilos na vila, lebre no gelo,
+// lagarto no deserto, suricato na savana, salamandra no vulcão, caranguejo no farol
+
+const critters = [];
+const CRITTER_BY_THEME = {
+  grass: ['coelho', 'esquilo'], snow: ['lebre'], desert: ['lagarto'],
+  savanna: ['suricato'], volcano: ['salamandra'], rockisle: ['caranguejo'],
+};
+let critterT = 0;
+
+function updateCritters(dt, camX, camY) {
+  critterT -= dt;
+  if (critterT <= 0 && critters.length < 7) {
+    critterT = 1.6;
+    const x = camX - 60 + Math.random() * (VW + 120);
+    const y = camY - 40 + Math.random() * (VH + 80);
+    const t = tileAtPx(x, y);
+    if (WALK_OK.has(t) && t !== T.PLANK) {
+      const near = WORLD.nearestIsland(Math.floor(x / TILE), Math.floor(y / TILE));
+      if (near.d < 1) {
+        const pool = CRITTER_BY_THEME[near.isl.theme];
+        if (pool) critters.push({ type: pool[(Math.random() * pool.length) | 0],
+          x, y, tx: x, ty: y, idle: Math.random() * 2, age: 0, flip: false });
+      }
+    }
+  }
+  for (let i = critters.length - 1; i >= 0; i--) {
+    const c = critters[i];
+    c.age += dt;
+    if (c.age > 45 || Math.abs(c.x - me.x) > VW * 1.4 || Math.abs(c.y - me.y) > VH * 1.6) { critters.splice(i, 1); continue; }
+    const pd = Math.hypot(me.x - c.x, me.y - c.y);
+    if (pd < 34) { // foge do jogador!
+      const ang = Math.atan2(c.y - me.y, c.x - me.x);
+      c.tx = c.x + Math.cos(ang) * 60; c.ty = c.y + Math.sin(ang) * 60;
+      c.idle = 0;
+    }
+    const d = Math.hypot(c.tx - c.x, c.ty - c.y);
+    if (d > 2) {
+      const spd = pd < 40 ? 75 : 34;
+      c.flip = c.tx < c.x;
+      const nx = c.x + ((c.tx - c.x) / d) * spd * dt;
+      const ny = c.y + ((c.ty - c.y) / d) * spd * dt;
+      if (WALK_OK.has(tileAtPx(nx, ny))) { c.x = nx; c.y = ny; c.hop = (c.hop || 0) + dt * 9; }
+      else { c.tx = c.x; c.ty = c.y; }
+    } else {
+      c.idle -= dt;
+      if (c.idle <= 0) {
+        c.idle = 1 + Math.random() * 3;
+        c.tx = c.x + (Math.random() * 2 - 1) * 44;
+        c.ty = c.y + (Math.random() * 2 - 1) * 44;
+      }
+    }
+  }
+}
+
+function drawCritter(c, time) {
+  const moving = Math.hypot(c.tx - c.x, c.ty - c.y) > 2;
+  const hop = moving ? Math.abs(Math.sin((c.hop || 0))) * 2.5 : 0;
+  const x = Math.round(c.x), y = Math.round(c.y);
+  ctx.save();
+  ctx.translate(x, y);
+  if (c.flip) ctx.scale(-1, 1);
+  drawShadow(0, 1, 4, 1.5);
+  ctx.translate(0, -hop);
+  switch (c.type) {
+    case 'coelho': case 'lebre': {
+      const fur = c.type === 'lebre' ? '#f4f6fa' : '#c9a87c';
+      const furD = c.type === 'lebre' ? '#c9d4e4' : '#a4835c';
+      ctx.fillStyle = furD; ctx.beginPath(); ctx.ellipse(0.5, -2.5, 4.4, 3.4, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = fur; ctx.beginPath(); ctx.ellipse(0, -3, 4, 3, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = fur; ctx.fillRect(-4.5, -9, 1.6, 5); ctx.fillRect(-2.2, -10, 1.6, 6); // orelhas
+      ctx.fillStyle = '#f0b8c8'; ctx.fillRect(-2, -9, 1, 3);
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(3.4, -2.5, 1.6, 0, 7); ctx.fill(); // rabinho
+      ctx.fillStyle = '#241d16'; ctx.fillRect(-3.4, -4, 1, 1);
+      break;
+    }
+    case 'esquilo': {
+      ctx.fillStyle = '#a35c2e'; // cauda grande curvada
+      ctx.beginPath(); ctx.moveTo(3, -2); ctx.quadraticCurveTo(8, -4, 6.5, -9);
+      ctx.quadraticCurveTo(5.5, -11.5, 3.5, -10); ctx.quadraticCurveTo(5.5, -8, 4, -5); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#c9803e'; ctx.beginPath(); ctx.ellipse(-0.5, -2.5, 3.6, 2.8, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#e8a860'; ctx.beginPath(); ctx.ellipse(-1, -2, 2, 1.6, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#c9803e'; ctx.fillRect(-4.5, -6, 3, 3); // cabeça
+      ctx.fillRect(-4.5, -7.4, 1.2, 1.6); // orelha
+      ctx.fillStyle = '#241d16'; ctx.fillRect(-4, -5.4, 1, 1);
+      break;
+    }
+    case 'lagarto': {
+      ctx.fillStyle = '#8aa838';
+      ctx.beginPath(); ctx.ellipse(0, -1.5, 4.5, 1.8, 0, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(4, -1.5); ctx.quadraticCurveTo(8, -1, 9.5, 1); ctx.lineTo(7.5, 1.5);
+      ctx.quadraticCurveTo(6, -0.2, 4, -0.5); ctx.fill(); // cauda
+      ctx.fillStyle = '#a8c458'; ctx.fillRect(-5.8, -3, 3, 2.4); // cabeça
+      ctx.fillStyle = '#241d16'; ctx.fillRect(-5.2, -2.6, 1, 1);
+      ctx.fillStyle = '#6d8a24'; ctx.fillRect(-2, -3.4, 1.2, 1); ctx.fillRect(1, -3.2, 1.2, 1);
+      break;
+    }
+    case 'suricato': {
+      ctx.fillStyle = '#d8b880'; ctx.fillRect(-1.5, -9, 3.4, 8); // em pé, vigiando
+      ctx.fillStyle = '#f0d8ac'; ctx.fillRect(-1, -7, 1.6, 5);
+      ctx.fillStyle = '#d8b880'; ctx.beginPath(); ctx.arc(0.2, -10, 2.2, 0, 7); ctx.fill();
+      ctx.fillStyle = '#3f2c16'; ctx.fillRect(-1.2, -10.6, 1.2, 1.2); // máscara do olho
+      ctx.fillStyle = '#241d16'; ctx.fillRect(-0.9, -10.3, 0.8, 0.8);
+      ctx.fillStyle = '#a4835c'; ctx.fillRect(1.4, -3.5, 1.2, 3.5); // cauda apoiada
+      break;
+    }
+    case 'salamandra': {
+      ctx.fillStyle = '#e05828';
+      ctx.beginPath(); ctx.ellipse(0, -1.5, 4.2, 1.7, 0, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(3.5, -1.5); ctx.quadraticCurveTo(7.5, -1, 9, 0.8); ctx.lineTo(7, 1.4);
+      ctx.quadraticCurveTo(5.5, -0.2, 3.5, -0.5); ctx.fill();
+      ctx.fillStyle = '#f08048'; ctx.fillRect(-5.5, -3, 3, 2.4);
+      ctx.fillStyle = '#ffd14a'; ctx.fillRect(-1.5, -2.6, 1, 1); ctx.fillRect(1, -2.2, 1, 1); // pintas de brasa
+      ctx.fillStyle = '#241d16'; ctx.fillRect(-5, -2.6, 1, 1);
+      break;
+    }
+    case 'caranguejo': {
+      ctx.fillStyle = '#d84838';
+      ctx.beginPath(); ctx.ellipse(0, -2, 3.8, 2.6, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#f06850'; ctx.beginPath(); ctx.ellipse(-0.5, -2.5, 2.4, 1.5, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#d84838';
+      ctx.fillRect(-5.5, -4.5, 2, 2); ctx.fillRect(3.5, -4.5, 2, 2); // garras
+      for (const lx of [-3, -1, 1, 3]) ctx.fillRect(lx, 0, 1, 1.6 + Math.sin(time * 10 + lx) * 0.5);
+      ctx.fillStyle = '#241d16'; ctx.fillRect(-1.5, -4.2, 1, 1); ctx.fillRect(0.8, -4.2, 1, 1);
+      break;
+    }
+  }
+  ctx.restore();
+}
+
 // confete de level-up (espaço de tela)
 const conf = [];
 function confetti() {
@@ -1154,21 +1313,20 @@ function buildAtlas() {
     }
   });
   SPR[T.PLANK] = mk4((g, r, v) => {
+    // deque de tábuas UNIFORMES: 3 fileiras iguais, emendas escalonadas por variante
     g.fillStyle = '#bc8f56'; g.fillRect(0, 0, 16, 16);
-    for (const y of [0, 5, 10]) {
-      g.fillStyle = y === 5 ? '#c39457' : '#b5884f';
-      g.fillRect(0, y, 16, 5);
-      g.fillStyle = '#77522a'; g.fillRect(0, y + 4, 16, 1);
-      g.fillStyle = '#dcac6c'; g.fillRect(0, y, 16, 1);
-      // veios da madeira
-      g.strokeStyle = 'rgba(122,84,42,.5)'; g.lineWidth = 1;
-      g.beginPath(); g.moveTo(r() * 6, y + 2); g.lineTo(6 + r() * 9, y + 2 + (r() > .5 ? 1 : 0)); g.stroke();
-    }
-    const jx = 3 + v * 3;
-    g.fillStyle = '#684622'; g.fillRect(jx, 0, 1, 16);
-    g.fillStyle = '#403016';
-    g.fillRect(jx + 2, 2, 1, 1); g.fillRect(jx + 2, 7, 1, 1); g.fillRect(jx + 2, 12, 1, 1);
-    if (r() > 0.6) { g.fillStyle = '#8a6234'; g.beginPath(); g.arc(12, 8, 1.4, 0, 7); g.fill(); }
+    [0, 5, 10].forEach((y, row) => {
+      g.fillStyle = '#b8894f'; g.fillRect(0, y, 16, row === 2 ? 6 : 5);
+      g.fillStyle = '#dcac6c'; g.fillRect(0, y, 16, 1);          // topo iluminado
+      g.fillStyle = '#77522a'; g.fillRect(0, y + (row === 2 ? 5 : 4), 16, 1); // fresta
+      // veio discreto e reto
+      g.fillStyle = 'rgba(122,84,42,.35)'; g.fillRect(2, y + 2, 11, 1);
+      // emenda da tábua: padrão fixo escalonado (tijolinho), com pregos
+      const jx = ((v * 4 + row * 6) % 15) + 0.5;
+      g.fillStyle = '#684622'; g.fillRect(jx, y, 1, row === 2 ? 6 : 5);
+      g.fillStyle = '#403016';
+      g.fillRect(jx - 2, y + 2, 1, 1); g.fillRect(jx + 2, y + 2, 1, 1);
+    });
   });
   SPR[T.VOLC] = mk4((g, r) => {
     g.fillStyle = '#5b4a58'; g.fillRect(0, 0, 16, 16);
@@ -1658,13 +1816,14 @@ const charCache = new Map();
 const SKINS = ['#e8b88a', '#d8a070', '#b87848', '#f0c898'];
 const HAIRS = ['#5a3a1a', '#2a2a2a', '#c87830', '#8a5a2a', '#d8c060'];
 
-function charColors(name) {
+function charColors(name, hue) {
   let hsum = 0;
   for (const c of name) hsum = (hsum * 31 + c.charCodeAt(0)) >>> 0;
+  const h = (hue === null || hue === undefined) ? hsum % 360 : hue; // cor escolhida no menu
   return {
-    shirt: `hsl(${hsum % 360}, 48%, 52%)`,
-    shirtD: `hsl(${hsum % 360}, 48%, 40%)`,
-    hat: `hsl(${(hsum * 7) % 360}, 35%, 45%)`,
+    shirt: `hsl(${h}, 55%, 52%)`,
+    shirtD: `hsl(${h}, 55%, 38%)`,
+    hat: `hsl(${(h + 40) % 360}, 42%, 44%)`,
     skin: SKINS[hsum % SKINS.length],
     hair: HAIRS[(hsum >> 3) % HAIRS.length],
     pants: '#3a4460',
@@ -1750,11 +1909,11 @@ function buildCharSprite(c, dir, frame, fishing) {
   return out;
 }
 
-function charSprite(name, dir, frame, fishing, npcColor) {
-  const key = `${name}|${dir}|${frame}|${fishing ? 1 : 0}`;
+function charSprite(name, dir, frame, fishing, npcColor, hue) {
+  const key = `${name}|${hue ?? 'n'}|${dir}|${frame}|${fishing ? 1 : 0}`;
   let s = charCache.get(key);
   if (!s) {
-    const c = charColors(name);
+    const c = charColors(name, hue);
     if (npcColor) { c.shirt = npcColor; c.shirtD = 'rgba(0,0,0,.25)'; }
     s = buildCharSprite(c, dir, frame, fishing);
     charCache.set(key, s);
@@ -1802,7 +1961,7 @@ const BOAT_SPRITES = {
 };
 
 // x,y = centro dos pés; boat = false | 'remo' | 'lancha' | 'veleiro'
-function drawChar(x, y, dir, name, moving, time, boat, fishing, npcColor) {
+function drawChar(x, y, dir, name, moving, time, boat, fishing, npcColor, hue) {
   x = Math.round(x); y = Math.round(y);
   if (boat) {
     const spr = BOAT_SPRITES[boat] || BOAT_SPRITES.remo;
@@ -1810,13 +1969,13 @@ function drawChar(x, y, dir, name, moving, time, boat, fishing, npcColor) {
     ctx.beginPath(); ctx.ellipse(x, y + 5, 16, 5, 0, 0, 7); ctx.fill();
     const bobY = Math.sin(time * 2 + x * 0.1) * 1;
     ctx.drawImage(spr, x - spr.width / 2, y + 9 - spr.height + bobY);
-    ctx.drawImage(charSprite(name, dir, 0, fishing, npcColor), x - 12, y - 31 + bobY);
+    ctx.drawImage(charSprite(name, dir, 0, fishing, npcColor, hue), x - 12, y - 31 + bobY);
     return;
   }
   drawShadow(x, y + 1, 7, 2.4);
   const frame = moving ? (Math.floor(time * 7) % 2 ? 1 : 2) : 0;
   const hop = moving ? -(Math.floor(time * 14) % 2) : 0;
-  ctx.drawImage(charSprite(name, dir, frame, fishing, npcColor), x - 12, y - 29 + hop);
+  ctx.drawImage(charSprite(name, dir, frame, fishing, npcColor, hue), x - 12, y - 29 + hop);
 }
 
 // visual do equipamento por tier — todos os jogadores veem ("ostentação")
@@ -2195,8 +2354,23 @@ function drawBirds(time) {
 
 // ---------------------------------------------------------------- loop
 
+// se algo der errado num frame, avisa e segue pro próximo (não congela o jogo)
+let errShown = false;
+addEventListener('error', (e) => {
+  if (errShown) return;
+  errShown = true;
+  toast('⚠️ Erro: ' + (e.message || 'desconhecido').slice(0, 80), 6000);
+});
+
 let lastT = performance.now();
 function loop(now) {
+  try { frame_(now); } catch (e) {
+    if (!errShown) { errShown = true; toast('⚠️ Erro no desenho: ' + String(e.message).slice(0, 70), 6000); }
+    console.error(e);
+    requestAnimationFrame(loop);
+  }
+}
+function frame_(now) {
   const dt = Math.min(0.05, (now - lastT) / 1000);
   lastT = now;
   const time = now / 1000;
@@ -2209,6 +2383,7 @@ function loop(now) {
       p.x += (p.tx - p.x) * Math.min(1, dt * 10);
       p.y += (p.ty - p.y) * Math.min(1, dt * 10);
     }
+    updateCritters(dt, Math.max(0, me.x - VW / 2), Math.max(0, me.y - VH / 2));
   }
 
   const camX = Math.max(0, Math.min(W * TILE - VW, me.x - VW / 2));
@@ -2226,6 +2401,7 @@ function loop(now) {
       if (spr) {
         const v = (t === T.DEEP || t === T.SHALLOW || t === T.LAVA)
           ? (frame + ((tx * 3 + ty * 5) & 3)) & 3
+          : t === T.PLANK ? (tx & 3) // tábuas em sequência regular, não aleatórias
           : (h2(tx, ty) * 4) | 0;
         ctx.drawImage(spr[v % spr.length], tx * TILE, ty * TILE);
         // manchas em escala grande atravessando tiles (mata a cara de grid)
@@ -2312,23 +2488,29 @@ function loop(now) {
       if (Math.hypot(d.x - me.x, d.y - me.y) < 40) drawLabel(d.x, d.y - 12, '[E] pegar', '#7affc8');
     }
 
-    // entidades ordenadas por Y (jogadores, NPCs e vegetação)
+    // entidades ordenadas por Y (jogadores, NPCs, bichinhos e vegetação)
     const ents = [];
     for (const d of DECOR) {
-      if (d.x < camX - 24 || d.x > camX + VW + 24 || d.y < camY - 8 || d.y > camY + VH + 32) continue;
+      // margens largas: casas são grandes (80px + telhado alto) — sem "pipocar" na borda
+      if (d.x < camX - 110 || d.x > camX + VW + 40 || d.y < camY - 12 || d.y > camY + VH + 120) continue;
       ents.push({ kind: 'decor', y: d.y, d });
     }
-    for (const n of NPCS) ents.push({ kind: 'npc', y: n.ty * TILE + 14, n });
+    for (const n of NPCS) {
+      const np = npcPos(n);
+      ents.push({ kind: 'npc', y: np.y, n, np });
+    }
+    for (const c of critters) ents.push({ kind: 'critter', y: c.y, c });
     for (const p of others.values()) ents.push({ kind: 'player', y: p.y, p });
     ents.push({ kind: 'me', y: me.y });
     ents.sort((a, b) => a.y - b.y);
 
     for (const e of ents) {
       if (e.kind === 'decor') { drawDecor(e.d, time); continue; }
+      if (e.kind === 'critter') { drawCritter(e.c, time); continue; }
       if (e.kind === 'npc') {
         const n = e.n;
-        const nx = n.tx * TILE + 8, ny = n.ty * TILE + 14;
-        drawChar(nx, ny, 'down', 'npc:' + n.id, false, time, false, false, n.role === 'shop' ? '#d9a24a' : '#9a6ad0');
+        const nx = e.np.x, ny = e.np.y;
+        drawChar(nx, ny, e.np.dir, 'npc:' + n.id, e.np.moving, time, false, false, n.role === 'shop' ? '#d9a24a' : '#9a6ad0');
         drawLabel(nx, ny - 34, n.name, '#ffe9a0');
         // indicador de missão
         if (n.role === 'quest' && catalog) {
@@ -2344,7 +2526,7 @@ function loop(now) {
       if (e.kind === 'player') {
         const p = e.p;
         const pMoving = Math.hypot(p.tx - p.x, p.ty - p.y) > 1.5;
-        drawChar(p.x, p.y, p.dir, p.name, pMoving, time, p.boat ? (p.boatT || 'remo') : false, !!p.fishing);
+        drawChar(p.x, p.y, p.dir, p.name, pMoving, time, p.boat ? (p.boatT || 'remo') : false, !!p.fishing, null, p.hue);
         if (p.sayFx && now < p.sayFx.until) drawSpeech(p.x, p.y - (p.boat ? 40 : 36), p.sayFx.text);
         else drawLabel(p.x, p.y - (p.boat ? 38 : 34), showName ? p.name : `Nível ${p.level}`, showName ? '#fff' : '#ffd88a');
         drawFishingRodAndLine(p, false, time, now);
@@ -2354,7 +2536,7 @@ function loop(now) {
           else drawLabel(p.x, p.y - 40 - age * 10, p.catchFx.fish.name + '!', catalog.rarities[p.catchFx.fish.rarity].color);
         }
       } else {
-        drawChar(me.x, me.y, me.dir, me.name, me.moving, time, me.boat ? (profile.boat || 'remo') : false, fish.phase !== 'idle');
+        drawChar(me.x, me.y, me.dir, me.name, me.moving, time, me.boat ? (profile.boat || 'remo') : false, fish.phase !== 'idle', null, profile.color);
         if (me.sayFx && now < me.sayFx.until) drawSpeech(me.x, me.y - (me.boat ? 40 : 36), me.sayFx.text);
         else drawLabel(me.x, me.y - (me.boat ? 38 : 34), showName ? me.name : `Nível ${profile.level}`, showName ? '#bfe8ff' : '#ffd88a');
         drawFishingRodAndLine(me, true, time, now);

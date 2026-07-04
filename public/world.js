@@ -166,10 +166,11 @@
     house(vx - 14, vy + 2); house(vx + 8, vy + 2);
     for (let y = vy - 4; y <= vy + 9; y++) set(vx, y, T.PATH);
     for (let x = vx - 12; x <= vx + 12; x++) set(x, vy - 3, T.PATH);
-    // cais: da praça até depois da praia leste
+    // da praça até a praia: estrada de terra; só o trecho final (areia + mar) é deque de madeira
     let shoreX = vx;
     while (shoreX < W - 1 && !isWater(at(shoreX, vy + 4))) shoreX++;
-    for (let x = vx + 2; x < shoreX + 9; x++) { set(x, vy + 4, T.PLANK); set(x, vy + 5, T.PLANK); }
+    for (let x = vx + 2; x < shoreX - 5; x++) { set(x, vy + 4, T.PATH); set(x, vy + 5, T.PATH); }
+    for (let x = shoreX - 5; x < shoreX + 9; x++) { set(x, vy + 4, T.PLANK); set(x, vy + 5, T.PLANK); }
 
     // 5) farol (torre 3x2 que bloqueia; o cliente desenha a torre por cima)
     const far = ISLANDS.find(i => i.id === 'farol');
@@ -199,5 +200,32 @@
     return map;
   }
 
-  return { W, H, TILE, T, WALK_OK, BOAT_OK, ISLANDS, NPCS, SPAWN, ZONE_NAMES, INTERIOR, FAROL_DOOR, genWorld, zoneAt, nearestIsland, h2 };
+  // ---- passeio dos NPCs: determinístico pelo relógio → todos os clientes e o
+  // servidor calculam a MESMA posição sem trocar mensagens
+
+  function npcWalkables(map, npc, radius = 4) {
+    const list = [];
+    for (let dy = -radius; dy <= radius; dy++) for (let dx = -radius; dx <= radius; dx++) {
+      const tx = npc.tx + dx, ty = npc.ty + dy;
+      if (tx < 0 || ty < 0 || tx >= W || ty >= H) continue;
+      if (WALK_OK.has(map[ty * W + tx])) list.push([tx * TILE + 8, ty * TILE + 8]);
+    }
+    if (!list.length) list.push([npc.tx * TILE + 8, npc.ty * TILE + 8]);
+    return list;
+  }
+
+  function npcPosAt(spots, npc, tms) {
+    if (npc.role !== 'quest') return { x: npc.tx * TILE + 8, y: npc.ty * TILE + 8, moving: false, dir: 'down' };
+    const period = 9000; // anda um trecho, para, observa, anda de novo
+    const seg = Math.floor(tms / period);
+    const pick = (s) => spots[(h2(npc.tx * 13 + s * 7, npc.ty * 11 + s * 3) * spots.length) | 0];
+    const [x0, y0] = pick(seg), [x1, y1] = pick(seg + 1);
+    const f = (tms % period) / period;
+    const k = Math.min(1, f / 0.35);
+    const x = x0 + (x1 - x0) * k, y = y0 + (y1 - y0) * k;
+    const dir = Math.abs(x1 - x0) > Math.abs(y1 - y0) ? (x1 < x0 ? 'left' : 'right') : (y1 < y0 ? 'up' : 'down');
+    return { x, y, moving: k < 1 && (x1 !== x0 || y1 !== y0), dir };
+  }
+
+  return { W, H, TILE, T, WALK_OK, BOAT_OK, ISLANDS, NPCS, SPAWN, ZONE_NAMES, INTERIOR, FAROL_DOOR, genWorld, zoneAt, nearestIsland, h2, npcWalkables, npcPosAt };
 });

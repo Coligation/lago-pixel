@@ -12,6 +12,8 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 const SAVE_FILE = path.join(__dirname, 'data', 'players.json');
 
 const MAP = WORLD.genWorld();
+const NPC_SPOTS = {};
+for (const n of WORLD.NPCS) NPC_SPOTS[n.id] = WORLD.npcWalkables(MAP, n);
 const tileAt = (px, py) => {
   const tx = Math.floor(px / WORLD.TILE), ty = Math.floor(py / WORLD.TILE);
   if (tx < 0 || ty < 0 || tx >= WORLD.W || ty >= WORLD.H) return WORLD.T.DEEP;
@@ -408,6 +410,7 @@ function getProfile(name) {
     dex: p.dex || {},               // fishId -> {n, best}
     quests: p.quests || {},         // npcId -> {idx, prog, zones:[]}
     achv: p.achv || [],             // conquistas desbloqueadas
+    color: Number.isFinite(p.color) ? p.color : null, // cor da roupa
     totalCaught: p.totalCaught || 0,
     bestCatch: p.bestCatch || null,
   };
@@ -498,7 +501,7 @@ function broadcast(type, data = {}, exceptWs = null) {
 function publicState(p) {
   return { id: p.id, name: p.name, x: Math.round(p.x), y: Math.round(p.y), dir: p.dir,
     moving: p.moving, boat: p.boat, level: p.profile.level,
-    rodT: p.profile.rod, lineT: p.profile.line, boatT: p.profile.boat, // equipamento visível ("ostentação")
+    rodT: p.profile.rod, lineT: p.profile.line, boatT: p.profile.boat, hue: p.profile.color, // equipamento e cor visíveis
     fishing: p.fishing ? p.fishing.phase : null, bobX: p.bobX, bobY: p.bobY };
 }
 
@@ -506,7 +509,7 @@ function profileView(p) {
   const pr = p.profile;
   return { coins: pr.coins, xp: pr.xp, level: pr.level, xpNext: xpForLevel(pr.level),
     rod: pr.rod, line: pr.line, boat: pr.boat, baits: pr.baits, activeBait: pr.activeBait,
-    inventory: pr.inventory, dex: pr.dex, quests: pr.quests, achv: pr.achv,
+    inventory: pr.inventory, dex: pr.dex, quests: pr.quests, achv: pr.achv, color: pr.color,
     totalCaught: pr.totalCaught, bestCatch: pr.bestCatch };
 }
 
@@ -699,7 +702,8 @@ wss.on('connection', (ws) => {
       case 'talk': {
         const npc = WORLD.NPCS.find(n => n.id === msg.npc);
         if (!npc) break;
-        if (Math.hypot(npc.tx * WORLD.TILE - player.x, npc.ty * WORLD.TILE - player.y) > 5 * WORLD.TILE) break;
+        const npcPos = WORLD.npcPosAt(NPC_SPOTS[npc.id], npc, Date.now());
+        if (Math.hypot(npcPos.x - player.x, npcPos.y - player.y) > 6 * WORLD.TILE) break;
         if (npc.role === 'shop') { send(ws, 'open_shop', { shop: 'itens' }); break; }
         if (npc.role === 'boatshop') { send(ws, 'open_shop', { shop: 'barcos' }); break; }
         const chain = QUESTS[npc.id];
@@ -801,6 +805,15 @@ wss.on('connection', (ws) => {
         break;
       }
 
+      case 'set_color': { // cor da roupa (fica no save)
+        const h = Number(msg.hue);
+        pr.color = Number.isFinite(h) ? ((h % 360) + 360) % 360 : null;
+        saveDirty = true;
+        send(ws, 'bought', { you: profileView(player) });
+        broadcast('player_state', { player: publicState(player) }, ws);
+        break;
+      }
+
       case 'chat': {
         const now = Date.now();
         if (now - player.lastChat < 500) break;
@@ -828,8 +841,15 @@ wss.on('connection', (ws) => {
             pr.coins += Number(args[0]) || 1000;
             saveDirty = true;
             send(ws, 'bought', { you: profileView(player) });
+          } else if (cmd === 'nivel') {
+            pr.level = Math.max(1, Math.min(99, parseInt(args[0]) || 1));
+            pr.xp = 0;
+            saveDirty = true;
+            send(ws, 'bought', { you: profileView(player) });
+            broadcast('player_state', { player: publicState(player) }, ws);
+            send(ws, 'toast', { text: `Nível ajustado para ${pr.level}.` });
           } else {
-            send(ws, 'toast', { text: 'Comandos: /evento /noite /dia /moedas <n>' });
+            send(ws, 'toast', { text: 'Comandos: /evento /noite /dia /moedas <n> /nivel <n>' });
           }
           break;
         }
