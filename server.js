@@ -245,7 +245,7 @@ const DROP_TTL_MS = 5 * 60 * 1000;
 const DAY_LEN = 1200; // 20 min por dia completo
 let timeOffset = 0;   // deslocado pelos comandos de GM
 let luckEvent = false, eventForced = false;
-const GM_PASS = process.env.GM_PASS || 'farol-supremo-77';
+const GM_PASS = process.env.GM_PASS || null; // sem env var, o modo GM fica desativado
 
 const dayPhase = () => ((Date.now() / 1000 + timeOffset) % DAY_LEN) / DAY_LEN; // 0..1
 const isNight = () => { const p = dayPhase(); return p >= 0.60 && p < 0.95; };
@@ -754,7 +754,7 @@ wss.on('connection', (ws) => {
         if (text.startsWith('/')) {
           const [cmd, ...args] = text.slice(1).split(/\s+/);
           if (cmd === 'gm') {
-            player.gm = args.join(' ') === GM_PASS;
+            player.gm = !!GM_PASS && args.join(' ') === GM_PASS;
             send(ws, 'toast', { text: player.gm ? '👑 Modo GM ativado!' : 'Senha incorreta.' });
           } else if (!player.gm) {
             send(ws, 'toast', { text: 'Comando desconhecido.' });
