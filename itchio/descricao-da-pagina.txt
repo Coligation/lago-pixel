@@ -1,0 +1,72 @@
+════════════════════════════════════════════════════════
+TEXTO PRA PÁGINA DO ITCH.IO (copiar e colar)
+════════════════════════════════════════════════════════
+
+--- TÍTULO ---
+Lago Pixel 🎣
+
+--- FRASE CURTA (short description / tagline) ---
+Pescaria multiplayer de pixel art no navegador — explore um arquipélago
+com os amigos, pesque 50 espécies e navegue de caravela. Grátis!
+
+--- DESCRIÇÃO COMPLETA ---
+🎣 LAGO PIXEL é um jogo de pescaria multiplayer que roda direto no
+navegador (PC e celular) — sem instalar nada.
+
+⛵ EXPLORE O ARQUIPÉLAGO
+Cinco ilhas com biomas próprios: a Vila do Cais, a Geleira Branca com
+seus iglus, a Duna Seca e seu bazar, a Costa Dourada de palhoças e a
+Ilha do Vulcão com a forja da Magda. Cada uma com peixes, missões,
+lojas e segredos próprios — inclusive grutas escondidas com tesouros.
+
+🐟 PESQUE 50 ESPÉCIES
+De lambaris a lendas abissais. Complete a coleção, bata recordes de
+peso e mostre suas capturas dropando os peixões no chão pros amigos
+verem o tamanho.
+
+👥 MULTIPLAYER DE VERDADE
+Todo mundo no mesmo mundo: chat, missões, eventos no mar, drops de
+presente — e caronas de barco! Compre uma caravela e leve até 3
+amigos pescando a bordo.
+
+🚤 PROGRIDA
+Prancha de remo → barco a remo → lancha → caravela. Varas, linhas e
+iscas regionais. Missões com NPCs em todas as ilhas e a misteriosa
+Vara do Guardião esperando no farol...
+
+🎮 CONTROLES
+Teclado (reconfigurável), toque no celular e gamepad.
+
+Feito com carinho em pixel art. Jogue com os amigos! 🐡
+
+--- TAGS SUGERIDAS ---
+fishing, multiplayer, pixel-art, browser, free, casual, mmo,
+relaxing, brazilian, portuguese
+
+--- CLASSIFICAÇÃO ---
+Everyone / Livre
+
+════════════════════════════════════════════════════════
+VERSÃO EM INGLÊS (opcional — alcança MUITO mais gente)
+════════════════════════════════════════════════════════
+
+--- TAGLINE ---
+Multiplayer pixel-art fishing in your browser — explore an
+archipelago with friends, catch 50 species, sail a caravel. Free!
+
+--- DESCRIPTION ---
+🎣 LAGO PIXEL is a multiplayer fishing game that runs right in your
+browser (desktop & mobile) — nothing to install.
+
+⛵ Explore 5 themed islands, each with its own fish, quests, shops
+and hidden treasure caves.
+🐟 Catch 50 species, complete the collection, break weight records
+and drop your biggest catches on the ground to show off.
+👥 True multiplayer: shared world, chat, sea events, gifts — and
+boat rides! Buy a caravel and take 3 friends fishing aboard.
+🚤 Progress from a paddleboard to a caravel, with regional rods,
+lines and baits.
+🎮 Keyboard (remappable), touch and gamepad support.
+
+Made with love in pixel art. Bring your friends! 🐡
+(Game texts are currently in Portuguese.)

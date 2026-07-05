@@ -1,0 +1,66 @@
+════════════════════════════════════════════════════════════════
+  🎣 LAGO PIXEL NO ITCH.IO — PASSO A PASSO
+════════════════════════════════════════════════════════════════
+
+PREPARO (5 min)
+────────────────────────────────────────────────────────────────
+1. Crie a conta em https://itch.io/register (grátis).
+2. Tire 3 a 5 PRINTS do jogo pra usar de capa e screenshots:
+   - a vila com jogadores e o cais
+   - você velejando de caravela (com carona a bordo!)
+   - o card de uma captura lendária
+   - uma gruta secreta / a forja do vulcão
+   💡 A capa precisa ter 630×500 px (pode recortar um print).
+   No Mac: Cmd+Shift+4 pra recortar direto.
+
+CRIAR O PROJETO (10 min)
+────────────────────────────────────────────────────────────────
+3. https://itch.io/game/new e preencha:
+   - Title: Lago Pixel
+   - Project URL: lago-pixel
+   - Classification: Games
+   - Kind of project: ★ HTML — "You have a file that will be played
+     in the browser"
+   - Release status: Released
+4. PRICING: escolha "$0 or donate" (grátis + pague quanto quiser).
+   → é o modelo recomendado pro nosso caso: o jogo roda no nosso
+     servidor, então cobrar entrada não trava ninguém — doação sim.
+   → Em Settings → "Revenue sharing" dá pra ver a taxa do itch
+     (padrão 10%, ajustável). Recebimento via PayPal.
+5. UPLOADS: suba o arquivo  lago-pixel-itchio.zip  (desta pasta)
+   e marque "This file will be played in the browser".
+6. EMBED OPTIONS (importante!):
+   - Viewport: 960 × 540  (ou marque "Fullscreen button": ON)
+   - ✅ Mobile friendly (orientation: landscape)
+   - ✅ Automatically start on page load
+7. DETAILS: cole a descrição do arquivo  descricao-da-pagina.txt,
+   suba a capa (630×500) e as screenshots, e as tags sugeridas.
+8. Visibility: Public → Save. PRONTO, o jogo está no ar! 🎉
+
+COMO FUNCIONA POR DENTRO
+────────────────────────────────────────────────────────────────
+- O zip contém só uma "moldura": um index.html que abre o jogo
+  real (lago-pixel.onrender.com) dentro da página do itch.
+- Vantagem: qualquer atualização que a gente fizer no jogo aparece
+  na hora no itch também — sem reupload de nada.
+- O multiplayer continua no mesmo mundo: quem entra pelo itch joga
+  junto com quem entra pelo link direto.
+
+DEPOIS DE PUBLICAR
+────────────────────────────────────────────────────────────────
+- Compartilhe a página nas redes/grupos (o link fica
+  https://SEU-USUARIO.itch.io/lago-pixel).
+- Poste "devlogs" no itch a cada atualização grande — o site
+  promove jogos ativos.
+- Se o movimento crescer: considerar o plano pago do Render
+  (~US$ 7/mês) pro servidor não hibernar, e aí sim pensar em
+  Steam (wrapper Electron + US$ 100 de taxa).
+
+DÚVIDAS FREQUENTES
+────────────────────────────────────────────────────────────────
+- "Dá pra cobrar depois?" Dá: muda o Pricing pra "Paid". Mas pra
+  valer a pena, antes a gente trava o servidor por chave de compra
+  (o itch tem API pra validar quem comprou) — é trabalho futuro.
+- "E os pagamentos?" Configure em Settings → Get paid: modo
+  "Collected by itch.io" (eles acumulam e repassam) é o mais
+  simples pra começar.
