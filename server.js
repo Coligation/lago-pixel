@@ -132,9 +132,10 @@ const LINES = {
   aco:      { name: 'Linha de Aço',      price: 3000, level: 9, drain: 0.55 },
 };
 const BOATS = {
-  remo:    { name: 'Barco a Remo', price: 800,   level: 3,  speed: 1.0, seats: 1 },
-  lancha:  { name: 'Lancha',       price: 5000,  level: 8,  speed: 1.9, seats: 2 },
-  veleiro: { name: 'Caravela',     price: 18000, level: 14, speed: 2.6, seats: 3 },
+  prancha: { name: 'Prancha de Remo', price: 300,   level: 2,  speed: 0.75, seats: 0 },
+  remo:    { name: 'Barco a Remo',    price: 800,   level: 5,  speed: 1.0,  seats: 1 },
+  lancha:  { name: 'Lancha',          price: 5000,  level: 10, speed: 1.9,  seats: 2 },
+  veleiro: { name: 'Caravela',        price: 18000, level: 15, speed: 2.6,  seats: 3 },
 };
 const BAITS = {
   minhoca:   { name: 'Minhoca',         price: 25,  pack: 10, biteFactor: 0.5,  luckBonus: 0 },
@@ -147,7 +148,7 @@ const BAITS = {
 // estoque de cada vendedor — cada ilha tem seus achados
 const SHOPS = {
   ze:     { title: '🐟 Peixe & Cia — Teodoro',     rods: ['bambu', 'fibra', 'carbono', 'dourada'], lines: ['nylon', 'trancada', 'aco'], baits: ['minhoca', 'brilhante'], boats: [] },
-  nino:   { title: '⚓ Estaleiro do Capitão Nereu', rods: [], lines: [], baits: [], boats: ['remo', 'lancha', 'veleiro'] },
+  nino:   { title: '⚓ Estaleiro do Capitão Nereu', rods: [], lines: [], baits: [], boats: ['prancha', 'remo', 'lancha', 'veleiro'] },
   iluq:   { title: '🧊 Empório Gelado do Iluq',     rods: [], lines: ['encerada'], baits: ['krill', 'minhoca'], boats: [] },
   rashid: { title: '🏜️ Bazar do Rashid',           rods: ['junco'], lines: ['nylon', 'trancada'], baits: ['minhoca', 'brilhante'], boats: [] },
   ayo:    { title: '🌾 Palhoça do Ayo',             rods: ['junco', 'fibra'], lines: [], baits: ['cupim', 'minhoca'], boats: [] },
@@ -1023,7 +1024,11 @@ wss.on('connection', (ws) => {
 
       case 'equip': { // troca o equipamento ativo (precisa possuir)
         const { kind, id } = msg;
-        if (kind === 'rod' && pr.rods.includes(id)) pr.rod = id;
+        if (kind === 'boat' && id === null) { // desequipar barco (pra pegar carona)
+          if (player.boat) { send(ws, 'toast', { text: 'Atraque na terra antes de guardar o barco!' }); break; }
+          pr.boat = null;
+        }
+        else if (kind === 'rod' && pr.rods.includes(id)) pr.rod = id;
         else if (kind === 'line' && pr.lines.includes(id)) pr.line = id;
         else if (kind === 'boat' && pr.boats.includes(id)) pr.boat = id;
         else break;

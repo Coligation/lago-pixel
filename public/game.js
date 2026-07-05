@@ -486,14 +486,25 @@ function refreshGear() {
       el.className = 'shopitem';
       el.innerHTML = `<div>${item.name} <div class="desc">${descs[kind](item)}</div></div>`;
       if (eqId === id) {
-        el.innerHTML += '<span class="owned">em uso ✓</span>';
+        el.innerHTML += '<span class="owned">equipado ✓</span>';
       } else {
         const btn = document.createElement('button');
         btn.className = 'btn';
-        btn.textContent = 'usar';
+        btn.textContent = 'equipar';
         btn.onclick = () => send({ type: 'equip', kind, id });
         el.appendChild(btn);
       }
+      box.appendChild(el);
+    }
+    if (kind === 'boat' && profile.boat) { // guardar o barco = andar livre e pegar carona
+      const el = document.createElement('div');
+      el.className = 'shopitem';
+      el.innerHTML = '<div>Guardar o barco <div class="desc">sem barco equipado você pode pegar carona no barco dos amigos</div></div>';
+      const btn = document.createElement('button');
+      btn.className = 'btn';
+      btn.textContent = 'desequipar';
+      btn.onclick = () => send({ type: 'equip', kind: 'boat', id: null });
+      el.appendChild(btn);
       box.appendChild(el);
     }
   }
@@ -506,6 +517,7 @@ function shade(hex, amt) {
   return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`;
 }
 const fishIconCache = new Map();
+// cada espécie ganha cor viva própria (do hash do id) + silhueta; a raridade colore as barbatanas
 function fishIcon(id, color, caught) {
   const key = `${id}|${color}|${caught ? 1 : 0}`;
   let c = fishIconCache.get(key);
@@ -513,46 +525,124 @@ function fishIcon(id, color, caught) {
   let hsh = 7;
   for (const ch of id) hsh = (hsh * 31 + ch.charCodeAt(0)) >>> 0;
   c = document.createElement('canvas');
-  c.width = 30; c.height = 16;
+  c.width = 60; c.height = 32; // 2x de resolução pro card e pro chão
+  c.style.width = '30px'; c.style.height = '16px'; // no dex continua compacto
   const g = c.getContext('2d');
-  const body = caught ? color : '#1c2a38';
-  const dark = caught ? shade(color, -55) : '#131f2b';
-  const lite = caught ? shade(color, 45) : '#1c2a38';
-  const long = hsh % 3 === 0;         // corpo alongado (enguia/agulha)
-  const chunky = hsh % 3 === 1;       // corpo alto (pacu/lua)
-  const bw = long ? 11 : chunky ? 7.5 : 9;
-  const bh = long ? 3 : chunky ? 6 : 4.5;
-  const cx = 12, cy = 8;
-  // cauda
-  g.fillStyle = body;
-  const tw = long ? 4 : 6;
-  g.beginPath(); g.moveTo(cx + bw - 1, cy); g.lineTo(cx + bw + tw, cy - 5); g.lineTo(cx + bw + tw, cy + 5); g.closePath(); g.fill();
-  // corpo
-  g.beginPath(); g.ellipse(cx, cy, bw, bh, 0, 0, 7); g.fill();
-  // barbatana dorsal (3 estilos)
-  g.fillStyle = dark;
-  const fin = hsh % 3;
-  if (fin === 0) { g.beginPath(); g.moveTo(cx - 3, cy - bh + 1); g.lineTo(cx, cy - bh - 3); g.lineTo(cx + 3, cy - bh + 1); g.closePath(); g.fill(); }
-  else if (fin === 1) { g.beginPath(); g.moveTo(cx - 4, cy - bh + 1); g.lineTo(cx + 1, cy - bh - 2); g.lineTo(cx + 4, cy - bh + 1); g.closePath(); g.fill(); }
-  else { g.fillRect(cx - 2, cy - bh - 2, 5, 3); }
-  // nadadeira inferior
-  g.beginPath(); g.moveTo(cx, cy + bh - 1); g.lineTo(cx + 2, cy + bh + 2); g.lineTo(cx + 4, cy + bh - 1); g.closePath(); g.fill();
-  // padrão: listras, pintas ou dorso escuro
+  g.scale(2, 2);
+  const shape = hsh % 5; // 0 comum · 1 alongado · 2 disco · 3 tubarão · 4 ornamental
+  const hue = hsh % 360;
+  const hue2 = (hue + 150 + ((hsh >> 5) % 60)) % 360; // padrão em cor complementar
+  const sat = shape === 3 ? 45 : 74;
+  const body = caught ? `hsl(${hue},${sat}%,55%)` : '#1c2a38';
+  const back = caught ? `hsl(${hue},${sat + 6}%,36%)` : '#131f2b';
+  const belly = caught ? `hsl(${(hue + 40) % 360},60%,82%)` : '#1c2a38';
+  const pat = caught ? `hsl(${hue2},72%,46%)` : '#131f2b';
+  const finC = caught ? color : '#16222e'; // raridade nas barbatanas
+  const outline = caught ? `hsl(${hue},55%,16%)` : '#0d151f';
+  const bw = [9, 11.5, 7, 10, 7.5][shape];
+  const bh = [4.5, 2.8, 6.3, 4, 4.3][shape];
+  const cx = shape === 1 ? 13 : 12, cy = 8;
+
+  const bodyPath = () => {
+    g.beginPath();
+    if (shape === 3) { // tubarão: focinho pontudo, dorso reto
+      g.moveTo(cx - bw - 2.5, cy + 0.5);
+      g.quadraticCurveTo(cx - bw + 2, cy - bh, cx + 2, cy - bh + 0.5);
+      g.quadraticCurveTo(cx + bw, cy - bh + 2, cx + bw + 1, cy);
+      g.quadraticCurveTo(cx + bw - 2, cy + bh, cx - 2, cy + bh - 0.5);
+      g.quadraticCurveTo(cx - bw, cy + bh - 1, cx - bw - 2.5, cy + 0.5);
+    } else if (shape === 1) { // alongado: agulha com focinho
+      g.moveTo(cx - bw - 3.5, cy);
+      g.quadraticCurveTo(cx - bw + 3, cy - bh - 0.6, cx + 3, cy - bh);
+      g.quadraticCurveTo(cx + bw, cy - bh + 0.6, cx + bw, cy);
+      g.quadraticCurveTo(cx + bw, cy + bh - 0.4, cx + 3, cy + bh);
+      g.quadraticCurveTo(cx - bw + 3, cy + bh + 0.6, cx - bw - 3.5, cy);
+    } else {
+      g.ellipse(cx, cy, bw, bh, 0, 0, 7);
+    }
+    g.closePath();
+  };
+
+  // cauda (na cor da raridade, com base do corpo)
+  g.fillStyle = finC;
+  if (shape === 3) { // meia-lua de tubarão
+    g.beginPath(); g.moveTo(cx + bw - 1, cy);
+    g.lineTo(cx + bw + 5, cy - 6); g.lineTo(cx + bw + 2.5, cy - 0.5);
+    g.lineTo(cx + bw + 5, cy + 5.5); g.closePath(); g.fill();
+  } else if (shape === 4) { // véu duplo esvoaçante
+    g.beginPath(); g.moveTo(cx + bw - 1.5, cy);
+    g.quadraticCurveTo(cx + bw + 6, cy - 7, cx + bw + 6.5, cy - 2.5);
+    g.quadraticCurveTo(cx + bw + 4, cy - 0.5, cx + bw + 6.5, cy + 2);
+    g.quadraticCurveTo(cx + bw + 6, cy + 7, cx + bw - 1.5, cy); g.closePath(); g.fill();
+  } else {
+    const tw = shape === 1 ? 3.6 : 5.5;
+    g.beginPath(); g.moveTo(cx + bw - 1, cy);
+    g.lineTo(cx + bw + tw, cy - 4.6); g.lineTo(cx + bw + tw - 1.4, cy);
+    g.lineTo(cx + bw + tw, cy + 4.6); g.closePath(); g.fill();
+  }
+
+  // corpo com contorno
+  g.fillStyle = body; bodyPath(); g.fill();
+  g.strokeStyle = outline; g.lineWidth = 0.9; bodyPath(); g.stroke();
+
   if (caught) {
-    const pat = (hsh >> 4) % 4;
-    g.save();
-    g.beginPath(); g.ellipse(cx, cy, bw, bh, 0, 0, 7); g.clip();
-    if (pat === 0) { g.fillStyle = dark; for (let i = -1; i <= 1; i++) g.fillRect(cx + i * 4 - 1, cy - bh, 2, bh * 2); }
-    else if (pat === 1) { g.fillStyle = dark; for (let i = 0; i < 4; i++) g.fillRect(cx - 5 + i * 3, cy - 2 + (i % 2) * 3, 1.5, 1.5); }
-    else if (pat === 2) { g.fillStyle = dark; g.fillRect(cx - bw, cy - bh, bw * 2, bh * 0.8); }
-    g.fillStyle = lite; g.fillRect(cx - bw + 1, cy + bh - 2.5, bw, 1.5); // barriga clara
+    g.save(); bodyPath(); g.clip();
+    g.fillStyle = back; // dorso mais escuro
+    g.beginPath(); g.ellipse(cx, cy - bh * 0.9, bw * 1.05, bh * 0.85, 0, 0, 7); g.fill();
+    g.fillStyle = belly; // barriga clara
+    g.beginPath(); g.ellipse(cx - 1, cy + bh * 0.95, bw * 0.9, bh * 0.62, 0, 0, 7); g.fill();
+    const p = (hsh >> 4) % 4; // padrão vivo
+    g.fillStyle = pat;
+    if (p === 0) for (let i = -1; i <= 1; i++) { // listras verticais
+      g.beginPath(); g.moveTo(cx + i * 4.4 - 1.2, cy - bh); g.lineTo(cx + i * 4.4 + 1, cy - bh);
+      g.lineTo(cx + i * 4.4 + 2, cy + bh); g.lineTo(cx + i * 4.4 - 0.2, cy + bh); g.closePath(); g.fill();
+    }
+    else if (p === 1) for (let i = 0; i < 5; i++) { // pintas grandes
+      g.beginPath(); g.arc(cx - 5.5 + i * 3.1, cy - 1.6 + (i % 2) * 3.4, 1.15, 0, 7); g.fill();
+    }
+    else if (p === 2) { // faixa lateral
+      g.fillRect(cx - bw - 3, cy - 1.1, bw * 2 + 6, 2.2);
+      g.fillStyle = 'rgba(255,255,255,.5)'; g.fillRect(cx - bw - 3, cy - 1.1, bw * 2 + 6, 0.7);
+    }
+    else { // chevrons
+      for (let i = -1; i <= 1; i++) {
+        g.beginPath(); g.moveTo(cx + i * 4.6 - 2, cy - bh + 0.5); g.lineTo(cx + i * 4.6, cy);
+        g.lineTo(cx + i * 4.6 - 2, cy + bh - 0.5); g.lineTo(cx + i * 4.6 - 0.7, cy + bh - 0.5);
+        g.lineTo(cx + i * 4.6 + 1.4, cy); g.lineTo(cx + i * 4.6 - 0.7, cy - bh + 0.5); g.closePath(); g.fill();
+      }
+    }
+    g.fillStyle = 'rgba(255,255,255,.35)'; // brilho no lombo
+    g.beginPath(); g.ellipse(cx - 2, cy - bh * 0.55, bw * 0.55, 1, -0.15, 0, 7); g.fill();
     g.restore();
   }
-  // olho e boca
+
+  // barbatanas (raridade)
+  g.fillStyle = finC;
+  if (shape === 2) { // disco: dorsal e anal altas
+    g.beginPath(); g.moveTo(cx - 4, cy - bh + 1); g.quadraticCurveTo(cx, cy - bh - 4, cx + 4.5, cy - bh + 1.5); g.closePath(); g.fill();
+    g.beginPath(); g.moveTo(cx - 3, cy + bh - 1); g.quadraticCurveTo(cx + 1, cy + bh + 3.6, cx + 4.5, cy + bh - 1.5); g.closePath(); g.fill();
+  } else if (shape === 3) { // dorsal triangular de tubarão
+    g.beginPath(); g.moveTo(cx - 2.5, cy - bh + 0.8); g.lineTo(cx + 0.5, cy - bh - 4); g.lineTo(cx + 3.5, cy - bh + 1); g.closePath(); g.fill();
+  } else if (shape === 4) { // dorsal-fita ornamental
+    g.beginPath(); g.moveTo(cx - 5, cy - bh + 1);
+    g.quadraticCurveTo(cx - 2, cy - bh - 4.5, cx + 2, cy - bh - 3);
+    g.quadraticCurveTo(cx + 4, cy - bh - 2, cx + 5, cy - bh + 1.5); g.closePath(); g.fill();
+  } else {
+    g.beginPath(); g.moveTo(cx - 3, cy - bh + 1); g.lineTo(cx + 0.5, cy - bh - 2.8); g.lineTo(cx + 3.5, cy - bh + 1); g.closePath(); g.fill();
+  }
+  // peitoral
+  g.beginPath(); g.moveTo(cx - 3, cy + 0.5); g.quadraticCurveTo(cx - 1, cy + 3.4, cx + 2, cy + 2.2);
+  g.quadraticCurveTo(cx - 0.5, cy + 1, cx - 3, cy + 0.5); g.closePath(); g.fill();
+
+  // olho grande com brilho e boca
   if (caught) {
-    g.fillStyle = '#fff'; g.beginPath(); g.arc(cx - bw + 3, cy - 1, 1.8, 0, 7); g.fill();
-    g.fillStyle = '#0a1420'; g.beginPath(); g.arc(cx - bw + 2.7, cy - 1, 1, 0, 7); g.fill();
-    g.fillStyle = dark; g.fillRect(cx - bw, cy + 1.5, 2, 1);
+    const ex = cx - bw + (shape === 3 || shape === 1 ? 4.5 : 3);
+    g.fillStyle = '#fff'; g.beginPath(); g.arc(ex, cy - 1.2, 2, 0, 7); g.fill();
+    g.fillStyle = '#101826'; g.beginPath(); g.arc(ex + 0.4, cy - 1, 1.15, 0, 7); g.fill();
+    g.fillStyle = '#fff'; g.fillRect(ex - 0.6, cy - 2.2, 0.9, 0.9);
+    g.strokeStyle = outline; g.lineWidth = 0.7;
+    g.beginPath(); g.moveTo(cx - bw - (shape === 1 ? 3 : shape === 3 ? 2 : 0), cy + 1.6);
+    g.lineTo(cx - bw + 2, cy + 2.2); g.stroke();
   }
   fishIconCache.set(key, c);
   return c;
@@ -638,14 +728,9 @@ function shopSection(box, title, kind, items, ownedId) {
     };
     el.innerHTML = `<div>${item.name}${kind === 'bait' ? ` ×${item.pack}` : ''} <div class="desc">${descs[kind]}${kind === 'bait' ? ` · você tem ${profile.baits[id] || 0}` : ''}</div></div>`;
     const ownedIds = { rod: profile.rods, line: profile.lines, boat: profile.boats }[kind] || [];
-    if (kind !== 'bait' && ownedId === id) {
-      el.innerHTML += '<span class="owned">equipado ✓</span>';
-    } else if (kind !== 'bait' && ownedIds.includes(id)) {
-      const btn = document.createElement('button');
-      btn.className = 'btn';
-      btn.textContent = 'equipar';
-      btn.onclick = () => send({ type: 'equip', kind, id });
-      el.appendChild(btn);
+    if (kind !== 'bait' && (ownedId === id || ownedIds.includes(id))) {
+      // o lojista só vende — equipar é no seu inventário (🪣 → 🎒 Equipamento)
+      el.innerHTML += '<span class="owned">adquirido ✓</span>';
     } else {
       const btn = document.createElement('button');
       btn.className = 'btn';
@@ -1213,12 +1298,13 @@ function sendMove(force) {
 }
 
 function updateMe(dt) {
-  if (me.riding) { // passageiro: gruda no barco do dono
+  if (me.riding) { // passageiro: gruda no barco do dono, olhando pra frente do barco
     me.moving = false;
     const o = others.get(me.riding);
     if (o) {
       const off = WORLD.SEAT_OFF[me.seat] || [0, 6];
       me.x = o.x + off[0]; me.y = o.y + off[1];
+      me.dir = o.dir;
     }
     const z0 = WORLD.zoneAt(Math.floor(me.x / TILE), Math.floor(me.y / TILE));
     if (z0 !== currentZone) { currentZone = z0; $('zonelabel').textContent = '📍 ' + ZONE_NAMES[z0]; onZoneMusic(z0); }
@@ -2816,15 +2902,38 @@ const BOAT_SPRITES = (() => {
     g.fillStyle = '#5a4224'; g.fillRect(28.6, 58, 1, 13.5);
   });
 
+  // ---------- PRANCHA DE REMO (o jogador fica de pé nela) ----------
+  const pranchaSide = mkBoat(36, 12, (g) => {
+    g.fillStyle = '#5a3a1a'; // contorno
+    g.beginPath(); g.ellipse(18, 6, 17, 4.6, 0, 0, 7); g.fill();
+    g.fillStyle = '#e8b24a';
+    g.beginPath(); g.ellipse(18, 5.8, 15.6, 3.6, 0, 0, 7); g.fill();
+    g.fillStyle = '#f6d07a';
+    g.beginPath(); g.ellipse(16, 5, 12, 2.2, 0, 0, 7); g.fill();
+    g.fillStyle = '#c8503a'; g.fillRect(6, 4.6, 24, 1.4); // faixa
+    g.fillStyle = '#5a3a1a'; g.fillRect(31, 7, 3.5, 3.5); // quilha
+  });
+  const pranchaVert = mkBoat(16, 40, (g) => {
+    g.fillStyle = '#5a3a1a';
+    g.beginPath(); g.ellipse(8, 20, 6.6, 19, 0, 0, 7); g.fill();
+    g.fillStyle = '#e8b24a';
+    g.beginPath(); g.ellipse(8, 20, 5.3, 17.6, 0, 0, 7); g.fill();
+    g.fillStyle = '#f6d07a';
+    g.beginPath(); g.ellipse(7.4, 18, 3.4, 14, 0, 0, 7); g.fill();
+    g.fillStyle = '#c8503a'; g.fillRect(7, 4.5, 2, 31);
+  });
+
   return {
+    prancha: { right: pranchaSide, left: flipX(pranchaSide), up: pranchaVert, down: pranchaVert },
     remo:    { right: remoSide, left: flipX(remoSide), up: remoUp, down: remoDown },
     lancha:  { right: lanchaSide, left: flipX(lanchaSide), up: lanchaUp, down: lanchaDown },
     veleiro: { right: caravelaSide, left: flipX(caravelaSide), up: caravelaUp, down: caravelaDown },
   };
 })();
 
-// x,y = centro dos pés; boat = false | 'remo' | 'lancha' | 'veleiro'
-function drawChar(x, y, dir, name, moving, time, boat, fishing, npcColor, hue) {
+// x,y = centro dos pés; boat = false | id do barco; riding = carona em barco alheio
+const BOAT_CROP = 21; // corta o boneco na cintura pra parecer DENTRO do casco
+function drawChar(x, y, dir, name, moving, time, boat, fishing, npcColor, hue, riding) {
   x = Math.round(x); y = Math.round(y);
   if (boat) {
     const set = BOAT_SPRITES[boat] || BOAT_SPRITES.remo;
@@ -2833,7 +2942,15 @@ function drawChar(x, y, dir, name, moving, time, boat, fishing, npcColor, hue) {
     ctx.beginPath(); ctx.ellipse(x, y + 5, Math.min(spr.width * 0.44, 30), 5.5, 0, 0, 7); ctx.fill();
     const bobY = Math.sin(time * 2 + x * 0.1) * 1;
     ctx.drawImage(spr, Math.round(x - spr.width / 2), Math.round(y + 9 - spr.height + bobY));
-    ctx.drawImage(charSprite(name, dir, 0, fishing, npcColor, hue), x - 12, y - 31 + bobY);
+    const cs = charSprite(name, dir, 0, fishing, npcColor, hue);
+    if (boat === 'prancha') ctx.drawImage(cs, x - 12, y - 33 + bobY); // de pé na prancha
+    else ctx.drawImage(cs, 0, 0, 24, BOAT_CROP, x - 12, y - 31 + bobY, 24, BOAT_CROP);
+    return;
+  }
+  if (riding) { // carona: cortado na cintura, balançando com o barco
+    const bobY = Math.sin(time * 2 + x * 0.1) * 1;
+    const cs = charSprite(name, dir, 0, fishing, npcColor, hue);
+    ctx.drawImage(cs, 0, 0, 24, BOAT_CROP, x - 12, y - 31 + bobY, 24, BOAT_CROP);
     return;
   }
   drawShadow(x, y + 1, 7, 2.4);
@@ -3170,7 +3287,7 @@ function drawReel() {
   // peixe pintado com a cor da raridade
   ctx.imageSmoothingEnabled = false;
   const fy = by + (1 - r.fishPos) * bh;
-  ctx.drawImage(fishIcon('reel-' + r.rarity, r.color, true), bx + bw / 2 - 15, fy - 8);
+  ctx.drawImage(fishIcon('reel-' + r.rarity, r.color, true), bx + bw / 2 - 15, fy - 8, 30, 16);
   // fadiga: zzz flutuando + aviso pulsante
   if (r.tired > 0) {
     const t2 = performance.now() / 1000;
@@ -3204,13 +3321,14 @@ function drawCatchCard(now) {
   ctx.beginPath(); ctx.roundRect(cx - 160, cy - 48, 320, 96, 14); ctx.fill(); ctx.stroke();
   ctx.textAlign = 'center';
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(fishIcon(f.fishId, r.color, true), cx - 148, cy - 16, 64, 34);
+  // foto no alto, ao lado do nome (sem invadir a linha de raridade/peso)
+  ctx.drawImage(fishIcon(f.fishId, r.color, true), cx - 152, cy - 43, 60, 32);
   ctx.fillStyle = r.color; ctx.font = 'bold 17px monospace';
-  ctx.fillText(f.name, cx + 20, cy - 14);
+  ctx.fillText(f.name, cx + 20, cy - 20);
   ctx.fillStyle = '#ccc'; ctx.font = '13px monospace';
-  ctx.fillText(`${r.label} · ${f.weight} kg · ${ZONE_NAMES[f.zone]}`, cx + 20, cy + 6);
+  ctx.fillText(`${r.label} · ${f.weight} kg · ${ZONE_NAMES[f.zone]}`, cx, cy + 6);
   ctx.fillStyle = '#ffd24a'; ctx.font = 'bold 14px monospace';
-  ctx.fillText(`+${f.value} 🪙 no balde`, cx + 20, cy + 28);
+  ctx.fillText(`+${f.value} 🪙 no balde`, cx, cy + 28);
   ctx.restore();
 }
 
@@ -3260,6 +3378,16 @@ function frame_(now) {
     updateMe(dt);
     if (reel) updateReel(dt);
     for (const p of others.values()) {
+      if (p.riding) { // carona: gruda no barco do dono e olha pra frente dele
+        const o = p.riding === me.id ? me : others.get(p.riding);
+        if (o) {
+          const off = WORLD.SEAT_OFF[p.seat] || [0, 6];
+          p.x = p.tx = o.x + off[0];
+          p.y = p.ty = o.y + off[1];
+          p.dir = o.dir;
+        }
+        continue;
+      }
       p.x += (p.tx - p.x) * Math.min(1, dt * 10);
       p.y += (p.ty - p.y) * Math.min(1, dt * 10);
     }
@@ -3366,9 +3494,13 @@ function frame_(now) {
       if (dr && dr !== myRoom) continue; // tesouro em gruta só aparece pra quem está dentro
       const r = catalog.rarities[d.fish.rarity];
       const bob = Math.sin(time * 3 + d.id) * 1.5;
-      drawShadow(d.x, d.y + 4, 6, 2);
-      ctx.drawImage(fishIcon(d.fish.fishId, r.color, true), d.x - 13, d.y - 7 + bob);
-      if (Math.hypot(d.x - me.x, d.y - me.y) < 40) drawLabel(d.x, d.y - 12, '[E] pegar', '#7affc8');
+      // ostentação: quanto mais pesado, maior o peixe no chão (escala logarítmica)
+      const s = Math.min(2.9, 0.8 + Math.log10(1 + (d.fish.weight || 0.1)) * 0.85);
+      drawShadow(d.x, d.y + 4, 7 * s, 2.2 * s);
+      ctx.drawImage(fishIcon(d.fish.fishId, r.color, true), d.x - 15 * s, d.y - 8 * s + bob, 30 * s, 16 * s);
+      if (Math.hypot(d.x - me.x, d.y - me.y) < 40 + 12 * s) {
+        drawLabel(d.x, d.y - 10 - 8 * s, `[E] pegar · ${d.fish.weight} kg`, '#7affc8');
+      }
     }
 
     // entidades ordenadas por Y (jogadores, NPCs, bichinhos e vegetação)
@@ -3417,7 +3549,7 @@ function frame_(now) {
         const pMoving = Math.hypot(p.tx - p.x, p.ty - p.y) > 1.5;
         const rodBehind = p.dir === 'up'; // pescando pro norte, a vara fica ATRÁS do corpo
         if (rodBehind) drawFishingRodAndLine(p, false, time, now);
-        drawChar(p.x, p.y, p.dir, p.name, pMoving, time, p.boat ? (p.boatT || 'remo') : false, !!p.fishing, null, p.hue);
+        drawChar(p.x, p.y, p.dir, p.name, pMoving, time, p.boat ? (p.boatT || 'remo') : false, !!p.fishing, null, p.hue, !!p.riding);
         if (p.sayFx && now < p.sayFx.until) drawSpeech(p.x, p.y - (p.boat ? 40 : 36), p.sayFx.text);
         else drawLabel(p.x, p.y - (p.boat ? 38 : 34), showName ? p.name : `Nível ${p.level}`, showName ? '#fff' : '#ffd88a');
         if (!rodBehind) drawFishingRodAndLine(p, false, time, now);
@@ -3429,7 +3561,7 @@ function frame_(now) {
       } else {
         const rodBehind = me.dir === 'up';
         if (rodBehind) drawFishingRodAndLine(me, true, time, now);
-        drawChar(me.x, me.y, me.dir, me.name, me.moving, time, me.boat ? (profile.boat || 'remo') : false, fish.phase !== 'idle', null, profile.color);
+        drawChar(me.x, me.y, me.dir, me.name, me.moving, time, me.boat ? (profile.boat || 'remo') : false, fish.phase !== 'idle', null, profile.color, !!me.riding);
         if (me.sayFx && now < me.sayFx.until) drawSpeech(me.x, me.y - (me.boat ? 40 : 36), me.sayFx.text);
         else drawLabel(me.x, me.y - (me.boat ? 38 : 34), showName ? me.name : `Nível ${profile.level}`, showName ? '#bfe8ff' : '#ffd88a');
         if (!rodBehind) drawFishingRodAndLine(me, true, time, now);
