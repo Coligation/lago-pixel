@@ -4,6 +4,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 const WORLD = require('./public/world.js');
 
@@ -356,8 +357,12 @@ function saveProfiles() {
   if (!saveDirty) return;
   saveDirty = false;
   ghDirty = true; // marca pro backup no GitHub também
-  fs.writeFile(SAVE_FILE, JSON.stringify(profiles), (err) => {
-    if (err) console.error('Erro ao salvar:', err.message);
+  // escrita atômica: tmp + rename (processo morto no meio da escrita não trunca o save)
+  fs.writeFile(SAVE_FILE + '.tmp', JSON.stringify(profiles), (err) => {
+    if (err) return console.error('Erro ao salvar:', err.message);
+    fs.rename(SAVE_FILE + '.tmp', SAVE_FILE, (err2) => {
+      if (err2) console.error('Erro ao salvar (rename):', err2.message);
+    });
   });
 }
 setInterval(saveProfiles, 10000);
@@ -419,9 +424,25 @@ async function ghBackup() {
 }
 setInterval(ghBackup, 3 * 60 * 1000);
 
+// ---------------------------------------------------------------- conta (senha com scrypt, nunca em texto puro)
+
+function hashPass(pass) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  return salt + ':' + crypto.scryptSync(pass, salt, 32).toString('hex');
+}
+function checkPass(pass, stored) {
+  try {
+    const [salt, h] = String(stored).split(':');
+    return crypto.timingSafeEqual(Buffer.from(h, 'hex'), crypto.scryptSync(pass, salt, 32));
+  } catch { return false; }
+}
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const NICK_RE = /^[\p{L}\p{N} _.-]{3,16}$/u;
+
 function getProfile(name) {
   const p = profiles[name] || {};
   profiles[name] = {
+    auth: p.auth || null, // { email, pass(hash), news, termsAt, token }
     coins: p.coins || 0, xp: p.xp || 0, level: p.level || 1,
     rod: RODS[p.rod] ? p.rod : 'bambu',
     line: LINES[p.line] ? p.line : 'nylon',
@@ -659,8 +680,38 @@ wss.on('connection', (ws) => {
 
     if (!player) {
       if (msg.type !== 'join') return;
-      let name = String(msg.name || 'Pescador').trim().slice(0, 16) || 'Pescador';
-      if ([...players.values()].some(p => p.name === name)) name += Math.floor(Math.random() * 90 + 10);
+      const name = String(msg.name || '').trim().slice(0, 16);
+      if (!NICK_RE.test(name)) { send(ws, 'auth_error', { text: 'Nick inválido — use 3 a 16 letras/números.' }); return; }
+      const existing = profiles[name];
+      const hasAuth = !!(existing && existing.auth && existing.auth.pass);
+
+      if (msg.register) {
+        // criar conta (ou reivindicar conta antiga sem senha, mantendo o progresso)
+        if (hasAuth) { send(ws, 'auth_error', { text: 'Esse nick já tem dono. Faça login ou escolha outro.' }); return; }
+        const r = msg.register;
+        const email = String(r.email || '').trim().toLowerCase().slice(0, 80);
+        const pass = String(r.pass || '');
+        if (r.terms !== true) { send(ws, 'auth_error', { text: 'É preciso aceitar os termos e condições.' }); return; }
+        if (!EMAIL_RE.test(email)) { send(ws, 'auth_error', { text: 'Email inválido.' }); return; }
+        if (pass.length < 6 || pass.length > 64) { send(ws, 'auth_error', { text: 'A senha precisa ter pelo menos 6 caracteres.' }); return; }
+        const prof = getProfile(name);
+        prof.auth = { email, pass: hashPass(pass), news: r.news === true,
+          termsAt: Date.now(), token: crypto.randomBytes(24).toString('hex') };
+        saveDirty = true;
+      } else {
+        if (!hasAuth) { send(ws, 'need_register', { name, legacy: !!existing }); return; }
+        const okToken = msg.token && msg.token === existing.auth.token;
+        const okPass = msg.pass && checkPass(String(msg.pass), existing.auth.pass);
+        if (!okToken && !okPass) {
+          send(ws, 'auth_error', { text: msg.token ? 'Sessão expirada — entre com sua senha.' : 'Senha incorreta.' });
+          return;
+        }
+      }
+
+      // mesma conta já online? a sessão nova assume (derruba a antiga)
+      for (const [ows, op] of players) {
+        if (op.name === name) { send(ows, 'auth_error', { text: 'Você entrou em outro aparelho.' }); ows.close(); }
+      }
 
       player = { ws, id: nextId++, name, x: WORLD.SPAWN.x, y: WORLD.SPAWN.y, dir: 'down',
         moving: false, boat: false, profile: getProfile(name), fishing: null,
@@ -669,6 +720,7 @@ wss.on('connection', (ws) => {
       saveDirty = true;
 
       send(ws, 'welcome', {
+        token: player.profile.auth.token,
         id: player.id, name, you: profileView(player),
         players: [...players.values()].filter(p => p !== player).map(publicState),
         drops: [...drops.values()],

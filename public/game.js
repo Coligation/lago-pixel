@@ -366,6 +366,7 @@ $('set-money').onclick = () => {
 };
 $('set-logout').onclick = () => {
   localStorage.removeItem('lp_name');
+  localStorage.removeItem('lp_token');
   location.reload();
 };
 $('money-x').onclick = () => {
@@ -727,15 +728,34 @@ $('sellbtn').onclick = () => send({ type: 'sell_all' });
 
 function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
 
-function connect(name) {
+function tryJoin(payload) {
+  if (ws && ws.readyState === 1) send({ type: 'join', ...payload });
+  else connect(payload);
+}
+
+function connect(payload) {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   ws = new WebSocket(`${proto}//${location.host}`);
-  ws.onopen = () => send({ type: 'join', name });
+  ws.onopen = () => send({ type: 'join', ...payload });
   ws.onclose = () => toast('Conexão perdida. Recarregue a página.', 60000);
   ws.onmessage = (ev) => {
     const m = JSON.parse(ev.data);
     switch (m.type) {
+      case 'auth_error':
+        localStorage.removeItem('lp_token');
+        $('login').style.display = 'flex';
+        lgMsg(m.text || 'Não deu pra entrar. Tente de novo.');
+        break;
+      case 'need_register':
+        $('login').style.display = 'flex';
+        setCadMode(true, m.name);
+        lgMsg(m.legacy
+          ? '⚠️ Esse pescador ainda não tem senha! Complete o cadastro pra proteger seu progresso.'
+          : 'Nick livre! Complete o cadastro pra criar sua conta.');
+        break;
       case 'welcome':
+        if (m.token) localStorage.setItem('lp_token', m.token);
+        lgMsg('');
         me.id = m.id; me.name = m.name;
         profile = m.you; catalog = m.catalog;
         timeOffset = m.timeOffset || 0; dayLen = m.dayLen || 1200; luckEvent = !!m.event;
@@ -1097,15 +1117,82 @@ function pollGamepad() {
   gpPrev = gp.buttons.map(b => b.pressed);
 }
 
-$('login-name').value = localStorage.getItem('lp_name') || '';
-$('login-btn').onclick = doLogin;
-$('login-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
-function doLogin() {
-  const name = $('login-name').value.trim() || 'Pescador';
-  localStorage.setItem('lp_name', name);
+// ---------------------------------------------------------------- login e cadastro
+
+const lgMsg = (t) => { $('login-msg').textContent = t || ''; };
+let cadMode = false;
+function setCadMode(on, presetNick) {
+  cadMode = on;
+  $('lg-entrar').style.display = on ? 'none' : 'block';
+  $('lg-cad').style.display = on ? 'block' : 'none';
+  $('login-switch').textContent = on ? 'Já tem conta? Entrar' : 'Não tem conta? Criar uma agora';
+  if (presetNick !== undefined) $('cad-name').value = presetNick;
+}
+$('login-switch').onclick = () => { setCadMode(!cadMode); lgMsg(''); };
+$('terms-link').onclick = () => { $('terms').style.display = 'block'; };
+
+// sensor ao vivo: campo repetido confere? ✓ / ✗
+function wireMatch(a, b, out, norm) {
+  const upd = () => {
+    const va = norm($(a).value), vb = norm($(b).value);
+    const el = $(out);
+    if (!vb) { el.textContent = ''; el.className = 'match'; return; }
+    const ok = va === vb && va.length > 0;
+    el.textContent = ok ? '✓' : '✗';
+    el.className = 'match ' + (ok ? 'ok' : 'bad');
+  };
+  $(a).addEventListener('input', upd);
+  $(b).addEventListener('input', upd);
+}
+wireMatch('cad-email', 'cad-email2', 'm-email', (v) => v.trim().toLowerCase());
+wireMatch('cad-pass', 'cad-pass2', 'm-pass', (v) => v);
+
+let audioStarted = false;
+function startAudio() {
+  if (audioStarted) return;
+  audioStarted = true;
   startAmbience();
   startMusic();
-  connect(name);
+}
+
+function doLogin() {
+  const name = $('login-name').value.trim();
+  if (name.length < 3) { lgMsg('Digite seu nick (3 a 16 caracteres).'); return; }
+  localStorage.setItem('lp_name', name);
+  startAudio();
+  tryJoin({ name, pass: $('login-pass').value });
+}
+
+function doRegister() {
+  const name = $('cad-name').value.trim();
+  const email = $('cad-email').value.trim();
+  const email2 = $('cad-email2').value.trim();
+  const pass = $('cad-pass').value, pass2 = $('cad-pass2').value;
+  if (name.length < 3) { lgMsg('O nick precisa de 3 a 16 caracteres.'); return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { lgMsg('Esse email não parece válido.'); return; }
+  if (email.toLowerCase() !== email2.trim().toLowerCase()) { lgMsg('Os emails não conferem.'); return; }
+  if (pass.length < 6) { lgMsg('A senha precisa de pelo menos 6 caracteres.'); return; }
+  if (pass !== pass2) { lgMsg('As senhas não conferem.'); return; }
+  if (!$('cad-terms').checked) { lgMsg('Você precisa aceitar os termos e condições.'); return; }
+  localStorage.setItem('lp_name', name);
+  startAudio();
+  tryJoin({ name, register: { email, pass, news: $('cad-news').checked, terms: true } });
+}
+
+$('login-name').value = localStorage.getItem('lp_name') || '';
+$('login-btn').onclick = doLogin;
+$('cad-btn').onclick = doRegister;
+$('login-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
+$('login-pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
+
+// sessão salva? entra direto (o som liga no primeiro toque, exigência dos navegadores)
+{
+  const tok = localStorage.getItem('lp_token'), nm = localStorage.getItem('lp_name');
+  if (tok && nm) {
+    tryJoin({ name: nm, token: tok });
+    addEventListener('pointerdown', startAudio, { once: true });
+    addEventListener('keydown', startAudio, { once: true });
+  }
 }
 
 // ---------------------------------------------------------------- movimento
