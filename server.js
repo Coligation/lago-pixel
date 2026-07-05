@@ -261,6 +261,137 @@ const ACHIEVEMENTS = [
   { id: 'big200', name: 'Monstro Marinho',   desc: 'Pesque um peixe de 200 kg+',  reward: 2500,  test: pr => Object.values(pr.dex).some(d => d.best >= 200) },
 ];
 
+// ---------------------------------------------------------------- inglês (i18n)
+// PT é a fonte da verdade; os dicionários EN cobrem catálogo, missões, conquistas
+// e mensagens. Se faltar tradução, cai no PT sem quebrar nada.
+
+const EN_FISH = {
+  bota: 'Old Boot', lata: 'Rusty Can', alga: 'Clump of Algae',
+  lambari: 'Silver Tetra', tilapia: 'Tilapia', carpa: 'Carp', bagre: 'Catfish', traira: 'Wolf Fish',
+  pacu: 'Pacu', tucunare: 'Giant Peacock Bass', jau: 'Giant Jau Catfish', koi: 'Golden Koi Carp',
+  sardinha: 'Sardine', cavala: 'Mackerel', atum: 'Tuna', robalo: 'Sea Bass', douradomar: 'Mahi-Mahi',
+  espadarte: 'Swordfish', martelo: 'Hammerhead Shark', lua: 'Sunfish', leviata: 'Baby Leviathan',
+  piaba: 'Desert Piaba', gatooasis: 'Oasis Catfish', pulmonado: 'Lungfish', serpente: 'Sand Serpent',
+  miragem: 'Mirage Eye', zebra: 'Zebra Tilapia', tigre: 'Tigerfish', elefante: 'Elephantfish',
+  percanilo: 'Nile Perch', bagreafro: 'Giant African Catfish', espirito: 'Savanna Spirit',
+  bacalhau: 'Arctic Cod', salmogelo: 'Ice Salmon', lanterna: 'Lanternfish', enguiapolar: 'Polar Eel',
+  narval: 'Dwarf Narwhal', coracaogelo: 'Heart of Ice', sereia: "Mermaid's Tail", aurora: 'Aurora Fish',
+  quimera: 'Oasis Chimera', faisca: 'Eternal Spark', megalodonte: 'Young Megalodon',
+  horror: 'Abyssal Horror', primordial: 'Primordial Fish',
+  moedaantiga: 'Ancient Coin', perola: 'Abyss Pearl', cristal: 'Sea Crystal', ambar: 'Millennial Amber', reliquia: 'Lost Relic',
+  sardadourada: 'Golden Sardine', olhoabismo: 'Eye of the Abyss', arcoiris: 'Rainbow Fish',
+  fantasma: 'Ghost Fish', palhacoreal: 'Royal Clownfish', dragmarinho: 'Leafy Seadragon',
+  voltaica: 'Voltaic Eel', lagrima: "Mermaid's Tear", carvao: 'Coalfish', tetracinza: 'Ash Tetra',
+  bloblava: 'Lava Blob', magma: 'Magma Fish', enguiafogo: 'Fire Eel', dragaolava: 'Lava Dragon',
+};
+const EN_ITEM = {
+  bambu: 'Bamboo Rod', junco: 'Reed Rod', fibra: 'Fiber Rod', carbono: 'Carbon Rod',
+  obsidiana: 'Obsidian Rod', dourada: 'Golden Rod', guardia: "Guardian's Rod",
+  nylon: 'Nylon Line', trancada: 'Braided Line', encerada: 'Waxed Line', aco: 'Steel Line',
+  prancha: 'Paddleboard', remo: 'Rowboat', lancha: 'Speedboat', veleiro: 'Caravel',
+  minhoca: 'Worm', cupim: 'Golden Termite', krill: 'Frozen Krill', brilhante: 'Shiny Lure', larva: 'Magma Larva',
+};
+const EN_RAR = { lixo: 'Junk', comum: 'Common', incomum: 'Uncommon', raro: 'Rare', epico: 'Epic', lendario: 'Legendary', mitico: 'Mythic', abissal: 'Abyssal' };
+const EN_ZONE = { vila: 'Harbor Village', gelo: 'White Glacier', deserto: 'Dry Dune', savana: 'Golden Coast', vulcao: 'Volcano Island', farol: 'Lighthouse Island', altomar: 'High Seas', tesouro: 'Secret Caves' };
+const EN_SHOP_TITLE = {
+  ze: '🐟 Fish & Co. — Teodoro', nino: "⚓ Captain Nereu's Shipyard", iluq: "🧊 Iluq's Frozen Emporium",
+  rashid: "🏜️ Rashid's Bazaar", ayo: "🌾 Ayo's Hut", magda: "🌋 Magda's Forge",
+};
+const EN_QUESTS = {
+  bia: ['Catch 3 fish of any kind.', 'Catch a Tilapia weighing 1.5 kg or more.', 'Register 6 different species in your collection.', 'Catch a Rare fish or better.', 'Fish in 3 different zones (buy a boat!).'],
+  omar: ['Catch 3 fish here in the Dry Dune.', 'Bring me a Lungfish from the oasis.', 'A Water Scorpion stung my camel. Avenge it!'],
+  zahra: ['The dunes are singing... catch 5 fish in the desert.', 'Bring 3 Desert Piabas for the camp tea.', 'The Sand Serpent guards a treasure: defeat it!'],
+  adama: ['Catch 3 fish on the Golden Coast.', 'The Tigerfish tore my net. Catch 2 of them!', 'They say the Nile Perch reaches 100 kg. Prove it!'],
+  kofi: ['The savanna river is generous. Catch 5 fish here.', 'Zebra Tilapias, 4 of them, for tomorrow\'s market.', 'The Giant Catfish swallowed my drum. Get it back!'],
+  nanuk: ['Catch 3 fish in the icy waters.', 'The Lanternfish lights up my igloo. Bring one!', 'Local legend: the Heart of Ice. Find it.'],
+  kira: ['The thaw scares the fish. Catch 5 here on the ice.', 'I need 3 Arctic Cod for the village feast.', 'The Polar Eel keeps stealing my nets. Capture it!'],
+  vulcana: ['Catch 3 fish in the volcano waters.', 'Catch an Epic fish or better anywhere.', 'The Lava Dragon sleeps in the crater. Wake it.'],
+  brasa: ['The boiling waters have a unique flavor. Catch 5 here.', 'A Magma Fish to forge my new knife!', "The Fire Eel... they say its hide doesn't burn."],
+  ilo: ['Catch 3 fish here by the lighthouse rocks.', 'A Swordfish nearly pierced my dinghy. Catch one!', 'On foggy nights I see a Leviathan... prove it exists.'],
+  pedro: ['Ah, youth! Catch 5 fish for this old man.', 'A 5 kg+ Carp for my Sunday stew.', 'Catch 10 fish in the village and take my old rod.'],
+  guardiao: ['You have come far, angler. Final trial: bring me 2 LEGENDARY fish and the Guardian\'s Rod is yours.'],
+};
+const EN_ACHV = {
+  p10: ['Novice Angler', 'Catch 10 fish'], p50: ['Seasoned Angler', 'Catch 50 fish'],
+  p200: ['Master Angler', 'Catch 200 fish'], p500: ['Legend of the Hook', 'Catch 500 fish'],
+  d10: ['Collector', 'Register 10 species'], d25: ['Living Encyclopedia', 'Register 25 species'],
+  d45: ['Complete Collection', 'Register every species'],
+  raro: ['Keen Eye', 'Catch a Rare fish'], epico: ['Lucky One', 'Catch an Epic fish'],
+  lenda: ['Legend Hunter', 'Catch a Legendary fish'], mito: ['Touched by Myth', 'Catch a Mythic fish'],
+  abismo: ['Faced the Abyss', 'Catch an Abyssal fish'],
+  big50: ['Caught a Big One', 'Catch a 50 kg+ fish'], big200: ['Sea Monster', 'Catch a 200 kg+ fish'],
+};
+const EN_TXT = {
+  'Balde cheio! Venda ou solte peixes.': 'Bucket full! Sell or drop some fish.',
+  'Balde cheio!': 'Bucket full!',
+  'Mire na água!': 'Aim at the water!',
+  'Moedas insuficientes!': 'Not enough coins!',
+  'Atraque na terra antes de guardar o barco!': 'Dock on land before stowing your boat!',
+  'Nenhum barco com lugar por perto.': 'No boat with a free seat nearby.',
+  '⚓ O dono do barco atracou.': '⚓ The boat owner has docked.',
+  'Demorou demais... o peixe fugiu!': 'Too slow... the fish got away!',
+  'Você entrou em outro aparelho.': 'You logged in on another device.',
+  'Nick inválido — use 3 a 16 letras/números.': 'Invalid nickname — use 3 to 16 letters/numbers.',
+  'Esse nick já tem dono. Faça login ou escolha outro.': 'That nickname is taken. Log in or pick another.',
+  'É preciso aceitar os termos e condições.': 'You must accept the terms and conditions.',
+  'Email inválido.': 'Invalid email.',
+  'A senha precisa ter pelo menos 6 caracteres.': 'The password needs at least 6 characters.',
+  'Sessão expirada — entre com sua senha.': 'Session expired — log in with your password.',
+  'Senha incorreta.': 'Wrong password.',
+  'Você já me ajudou com tudo. O arquipélago agradece, lenda!': 'You have already helped me with everything. The archipelago thanks you, legend!',
+  '\n(Vara repetida — leve as moedas!) ': '\n(Duplicate rod — take the coins instead!) ',
+  '\n\nEra a última — obrigado!': '\n\nThat was the last one — thank you!',
+  '🌙 MARÉ DE SORTE! Chance em dobro de peixes raros esta noite!': '🌙 LUCKY TIDE! Double chance of rare fish tonight!',
+  'A Maré de Sorte se dissipou...': 'The Lucky Tide has faded...',
+};
+
+const langOf = (p) => (p && p.lang === 'en' ? 'en' : 'pt');
+const trs = (lang, s) => (lang === 'en' ? (EN_TXT[s] || s) : s);
+const trp = (p, s) => trs(langOf(p), s);
+const zoneName = (lang, z) => (lang === 'en' ? (EN_ZONE[z] || z) : (WORLD.ZONE_NAMES[z] || z));
+const fishName = (lang, id, fb) => (lang === 'en' ? (EN_FISH[id] || fb) : fb);
+const itemName = (lang, id, fb) => (lang === 'en' ? (EN_ITEM[id] || fb) : fb);
+const rarLabel = (lang, r) => (lang === 'en' ? (EN_RAR[r] || r) : RARITIES[r].label);
+const questText = (lang, npcId, idx, q) =>
+  (lang === 'en' && EN_QUESTS[npcId] && EN_QUESTS[npcId][idx]) ? EN_QUESTS[npcId][idx] : q.text;
+
+const SHOP_PLACE_EN = {};
+for (const [npcId, s] of Object.entries(SHOPS)) {
+  const npc = WORLD.NPCS.find((n) => n.id === npcId);
+  const isl = WORLD.ISLANDS.find((i) => i.id === npc.island);
+  const place = `${npc.name} (${EN_ZONE[isl.zone] || isl.name})`;
+  for (const [kind, key] of [['rod', 'rods'], ['line', 'lines'], ['bait', 'baits'], ['boat', 'boats']]) {
+    for (const id of s[key]) if (!SHOP_PLACE_EN[kind + ':' + id]) SHOP_PLACE_EN[kind + ':' + id] = place;
+  }
+}
+
+function buildCatalog(lang) {
+  const en = lang === 'en';
+  const named = (obj) => {
+    const o = {};
+    for (const [id, it] of Object.entries(obj)) o[id] = { ...it, name: en ? (EN_ITEM[id] || it.name) : it.name };
+    return o;
+  };
+  const rar = {};
+  for (const [id, r] of Object.entries(RARITIES)) rar[id] = { ...r, label: en ? (EN_RAR[id] || r.label) : r.label };
+  return {
+    rods: named(RODS), lines: named(LINES), boats: named(BOATS), baits: named(BAITS),
+    rarities: rar,
+    where: en ? SHOP_PLACE_EN : SHOP_PLACE,
+    fish: FISH.map((f) => ({ ...f, name: en ? (EN_FISH[f.id] || f.name) : f.name })),
+    quests: Object.fromEntries(Object.entries(QUESTS).map(([n, arr]) =>
+      [n, arr.map((q, i) => ({ ...q, text: questText(lang, n, i, q) }))])),
+    achievements: ACHIEVEMENTS.map(({ id, name, desc, reward }) =>
+      (en && EN_ACHV[id]) ? { id, name: EN_ACHV[id][0], desc: EN_ACHV[id][1], reward } : { id, name, desc, reward }),
+  };
+}
+const CATALOGS = { pt: buildCatalog('pt'), en: buildCatalog('en') };
+
+// anúncio traduzido pro idioma de cada jogador conectado
+function announceAll(mk, rarity, exceptWs = null) {
+  for (const [cws, p] of players) if (cws !== exceptWs) send(cws, 'announce', { text: mk(langOf(p)), rarity });
+}
+
 function checkAchievements(p) {
   const pr = p.profile;
   for (const a of ACHIEVEMENTS) {
@@ -268,7 +399,9 @@ function checkAchievements(p) {
     pr.achv.push(a.id);
     pr.coins += a.reward;
     saveDirty = true;
-    send(p.ws, 'toast', { text: `🏆 Conquista: ${a.name}! +${a.reward} moedas` });
+    send(p.ws, 'toast', { text: langOf(p) === 'en'
+      ? `🏆 Achievement: ${(EN_ACHV[a.id] || [a.name])[0]}! +${a.reward} coins`
+      : `🏆 Conquista: ${a.name}! +${a.reward} moedas` });
     broadcast('announce', { text: `🏆 ${p.name} conquistou "${a.name}"!`, rarity: 'epico' }, p.ws);
   }
 }
@@ -291,9 +424,9 @@ function setLuckEvent(on, forced) {
   if (luckEvent === on) return;
   luckEvent = on; eventForced = !!forced;
   broadcast('event', { active: on });
-  broadcast('announce', on
-    ? { text: '🌙 MARÉ DE SORTE! Chance em dobro de peixes raros esta noite!', rarity: 'mitico' }
-    : { text: 'A Maré de Sorte se dissipou...', rarity: 'comum' });
+  announceAll((lg) => trs(lg, on
+    ? '🌙 MARÉ DE SORTE! Chance em dobro de peixes raros esta noite!'
+    : 'A Maré de Sorte se dissipou...'), on ? 'mitico' : 'comum');
 }
 setInterval(() => {
   if (isNight() && !luckEvent && Math.random() < 0.06) setLuckEvent(true, false); // ~algumas noites
@@ -455,6 +588,7 @@ function getProfile(name) {
   const p = profiles[name] || {};
   profiles[name] = {
     auth: p.auth || null, // { email, pass(hash), news, termsAt, token }
+    lang: p.lang === 'en' ? 'en' : 'pt',
     coins: p.coins || 0, xp: p.xp || 0, level: p.level || 1,
     rod: RODS[p.rod] ? p.rod : 'bambu',
     line: LINES[p.line] ? p.line : 'nylon',
@@ -669,7 +803,7 @@ function dismount(p, nearX, nearY) {
 function dropRiders(owner) {
   for (const r of ridersOf(owner)) {
     dismount(r);
-    send(r.ws, 'toast', { text: '⚓ O dono do barco atracou.' });
+    send(r.ws, 'toast', { text: trp(r, '⚓ O dono do barco atracou.') });
   }
 }
 
@@ -689,7 +823,7 @@ function gainXp(p, amount) {
     pr.xp -= xpForLevel(pr.level);
     pr.level++;
     send(p.ws, 'levelup', { level: pr.level });
-    broadcast('announce', { text: `⭐ ${p.name} subiu para o nível ${pr.level}!`, rarity: 'incomum' }, p.ws);
+    announceAll((lg) => lg === 'en' ? `⭐ ${p.name} reached level ${pr.level}!` : `⭐ ${p.name} subiu para o nível ${pr.level}!`, 'incomum', p.ws);
   }
 }
 
@@ -764,20 +898,21 @@ wss.on('connection', (ws) => {
 
     if (!player) {
       if (msg.type !== 'join') return;
+      const L = msg.lang === 'en' ? 'en' : 'pt';
       const name = String(msg.name || '').trim().slice(0, 16);
-      if (!NICK_RE.test(name)) { send(ws, 'auth_error', { text: 'Nick inválido — use 3 a 16 letras/números.' }); return; }
+      if (!NICK_RE.test(name)) { send(ws, 'auth_error', { text: trs(L, 'Nick inválido — use 3 a 16 letras/números.') }); return; }
       const existing = profiles[name];
       const hasAuth = !!(existing && existing.auth && existing.auth.pass);
 
       if (msg.register) {
         // criar conta (ou reivindicar conta antiga sem senha, mantendo o progresso)
-        if (hasAuth) { send(ws, 'auth_error', { text: 'Esse nick já tem dono. Faça login ou escolha outro.' }); return; }
+        if (hasAuth) { send(ws, 'auth_error', { text: trs(L, 'Esse nick já tem dono. Faça login ou escolha outro.') }); return; }
         const r = msg.register;
         const email = String(r.email || '').trim().toLowerCase().slice(0, 80);
         const pass = String(r.pass || '');
-        if (r.terms !== true) { send(ws, 'auth_error', { text: 'É preciso aceitar os termos e condições.' }); return; }
-        if (!EMAIL_RE.test(email)) { send(ws, 'auth_error', { text: 'Email inválido.' }); return; }
-        if (pass.length < 6 || pass.length > 64) { send(ws, 'auth_error', { text: 'A senha precisa ter pelo menos 6 caracteres.' }); return; }
+        if (r.terms !== true) { send(ws, 'auth_error', { text: trs(L, 'É preciso aceitar os termos e condições.') }); return; }
+        if (!EMAIL_RE.test(email)) { send(ws, 'auth_error', { text: trs(L, 'Email inválido.') }); return; }
+        if (pass.length < 6 || pass.length > 64) { send(ws, 'auth_error', { text: trs(L, 'A senha precisa ter pelo menos 6 caracteres.') }); return; }
         const prof = getProfile(name);
         prof.auth = { email, pass: hashPass(pass), news: r.news === true,
           termsAt: Date.now(), token: crypto.randomBytes(24).toString('hex') };
@@ -787,19 +922,20 @@ wss.on('connection', (ws) => {
         const okToken = msg.token && msg.token === existing.auth.token;
         const okPass = msg.pass && checkPass(String(msg.pass), existing.auth.pass);
         if (!okToken && !okPass) {
-          send(ws, 'auth_error', { text: msg.token ? 'Sessão expirada — entre com sua senha.' : 'Senha incorreta.' });
+          send(ws, 'auth_error', { text: trs(L, msg.token ? 'Sessão expirada — entre com sua senha.' : 'Senha incorreta.') });
           return;
         }
       }
 
       // mesma conta já online? a sessão nova assume (derruba a antiga)
       for (const [ows, op] of players) {
-        if (op.name === name) { send(ows, 'auth_error', { text: 'Você entrou em outro aparelho.' }); ows.close(); }
+        if (op.name === name) { send(ows, 'auth_error', { text: trp(op, 'Você entrou em outro aparelho.') }); ows.close(); }
       }
 
-      player = { ws, id: nextId++, name, x: WORLD.SPAWN.x, y: WORLD.SPAWN.y, dir: 'down',
+      player = { ws, id: nextId++, name, lang: L, x: WORLD.SPAWN.x, y: WORLD.SPAWN.y, dir: 'down',
         moving: false, boat: false, profile: getProfile(name), fishing: null,
         bobX: null, bobY: null, lastChat: 0, gm: false, sessionStart: Date.now() };
+      player.profile.lang = L;
       { // abre a sessão já na entrada (saída vai sendo atualizada pelo checkpoint)
         const prf2 = player.profile, t0 = player.sessionStart;
         if (!prf2.firstSeen) prf2.firstSeen = t0;
@@ -818,12 +954,10 @@ wss.on('connection', (ws) => {
         players: [...players.values()].filter(p => p !== player).map(publicState),
         drops: [...drops.values()],
         timeOffset, dayLen: DAY_LEN, event: luckEvent, zones: zonesView(),
-        catalog: { rods: RODS, lines: LINES, boats: BOATS, baits: BAITS, rarities: RARITIES,
-          where: SHOP_PLACE, fish: FISH, quests: QUESTS,
-          achievements: ACHIEVEMENTS.map(({ id, name, desc, reward }) => ({ id, name, desc, reward })) },
+        catalog: CATALOGS[L],
       });
       broadcast('player_join', { player: publicState(player) }, ws);
-      broadcast('announce', { text: `🎣 ${name} chegou ao arquipélago!`, rarity: 'comum' }, ws);
+      announceAll((lg) => lg === 'en' ? `🎣 ${name} arrived at the archipelago!` : `🎣 ${name} chegou ao arquipélago!`, 'comum', ws);
       return;
     }
 
@@ -864,10 +998,15 @@ wss.on('connection', (ws) => {
           const d = Math.hypot(q.x - player.x, q.y - player.y);
           if (d < bd) { bd = d; best = q; }
         }
-        if (!best) { send(ws, 'toast', { text: 'Nenhum barco com lugar por perto.' }); break; }
+        if (!best) { send(ws, 'toast', { text: trp(player, 'Nenhum barco com lugar por perto.') }); break; }
         const seats = BOATS[best.profile.boat].seats;
         const taken = ridersOf(best).map(r => r.seat);
-        if (taken.length >= seats) { send(ws, 'toast', { text: `O ${BOATS[best.profile.boat].name} de ${best.name} está lotado!` }); break; }
+        if (taken.length >= seats) {
+          send(ws, 'toast', { text: langOf(player) === 'en'
+            ? `${best.name}'s ${itemName('en', best.profile.boat, BOATS[best.profile.boat].name)} is full!`
+            : `O ${BOATS[best.profile.boat].name} de ${best.name} está lotado!` });
+          break;
+        }
         let seat = 0;
         while (taken.includes(seat)) seat++;
         player.riding = best.id; player.seat = seat;
@@ -875,7 +1014,8 @@ wss.on('connection', (ws) => {
         const off = WORLD.SEAT_OFF[seat] || [0, 6];
         player.x = best.x + off[0]; player.y = best.y + off[1];
         send(ws, 'ride', { owner: best.id, seat });
-        send(best.ws, 'toast', { text: `⛵ ${player.name} embarcou com você!` });
+        send(best.ws, 'toast', { text: langOf(best) === 'en'
+          ? `⛵ ${player.name} hopped aboard!` : `⛵ ${player.name} embarcou com você!` });
         broadcast('player_state', { player: publicState(player) }, ws);
         break;
       }
@@ -905,9 +1045,9 @@ wss.on('connection', (ws) => {
 
       case 'cast': {
         if (player.fishing) break;
-        if (pr.inventory.length >= INVENTORY_CAP) { send(ws, 'toast', { text: 'Balde cheio! Venda ou solte peixes.' }); break; }
+        if (pr.inventory.length >= INVENTORY_CAP) { send(ws, 'toast', { text: trp(player, 'Balde cheio! Venda ou solte peixes.') }); break; }
         const bx = Number(msg.bobX), by = Number(msg.bobY);
-        if (!isWaterPx(bx, by)) { send(ws, 'toast', { text: 'Mire na água!' }); break; }
+        if (!isWaterPx(bx, by)) { send(ws, 'toast', { text: trp(player, 'Mire na água!') }); break; }
         if (Math.hypot(bx - player.x, by - player.y) > 5 * WORLD.TILE) break;
         player.bobX = bx; player.bobY = by;
         const zone = WORLD.zoneAt(Math.floor(bx / WORLD.TILE), Math.floor(by / WORLD.TILE));
@@ -929,7 +1069,7 @@ wss.on('connection', (ws) => {
           player.fishing.windowTimer = setTimeout(() => {
             if (player.fishing && player.fishing.phase === 'bite') {
               clearFishing(player);
-              send(ws, 'escaped', { reason: 'Demorou demais... o peixe fugiu!' });
+              send(ws, 'escaped', { reason: trp(player, 'Demorou demais... o peixe fugiu!') });
               broadcast('player_state', { player: publicState(player) }, ws);
             }
           }, BITE_WINDOW_MS);
@@ -981,12 +1121,14 @@ wss.on('connection', (ws) => {
           send(ws, 'catch', { fish, you: profileView(player) });
           broadcast('player_catch', { id: player.id, name: player.name, fish }, ws);
           if (RARITY_ORDER.indexOf(fish.rarity) >= 3) {
-            broadcast('announce', {
-              text: `✨ ${player.name} pescou ${fish.name} (${RARITIES[fish.rarity].label}, ${fish.weight} kg) — ${WORLD.ZONE_NAMES[fish.zone]}!`,
-              rarity: fish.rarity });
+            announceAll((lg) => lg === 'en'
+              ? `✨ ${player.name} caught a ${fishName(lg, fish.fishId, fish.name)} (${rarLabel(lg, fish.rarity)}, ${fish.weight} kg) — ${zoneName(lg, fish.zone)}!`
+              : `✨ ${player.name} pescou ${fish.name} (${RARITIES[fish.rarity].label}, ${fish.weight} kg) — ${WORLD.ZONE_NAMES[fish.zone]}!`,
+              fish.rarity);
           }
         } else {
-          send(ws, 'escaped', { reason: `O ${fish.name} escapou!` });
+          send(ws, 'escaped', { reason: langOf(player) === 'en'
+            ? `The ${fishName('en', fish.fishId, fish.name)} got away!` : `O ${fish.name} escapou!` });
         }
         broadcast('player_state', { player: publicState(player) }, ws);
         break;
@@ -1003,13 +1145,17 @@ wss.on('connection', (ws) => {
           const s = SHOPS[npc.id];
           if (!s) break;
           player.shopId = npc.id;
-          send(ws, 'open_shop', { shopId: npc.id, title: s.title,
+          send(ws, 'open_shop', {
+            shopId: npc.id,
+            title: langOf(player) === 'en' ? (EN_SHOP_TITLE[npc.id] || s.title) : s.title,
             stock: { rod: s.rods, line: s.lines, bait: s.baits, boat: s.boats } });
           break;
         }
         const chain = QUESTS[npc.id];
         const { st, q, prog, done } = questProgress(pr, npc.id);
-        if (!q) { send(ws, 'dialog', { npc: npc.name, text: 'Você já me ajudou com tudo. O arquipélago agradece, lenda!' }); break; }
+        const lg = langOf(player);
+        const recebeu = lg === 'en' ? 'You received' : 'Você recebeu';
+        if (!q) { send(ws, 'dialog', { npc: npc.name, text: trp(player, 'Você já me ajudou com tudo. O arquipélago agradece, lenda!') }); break; }
         if (done) {
           pr.coins += q.reward.coins;
           gainXp(player, q.reward.xp);
@@ -1017,28 +1163,36 @@ wss.on('connection', (ws) => {
           if (q.reward.rod && RODS[q.reward.rod] && !pr.rods.includes(q.reward.rod)) {
             pr.rods.push(q.reward.rod);
             if (RODS[q.reward.rod].luck > RODS[pr.rod].luck) pr.rod = q.reward.rod;
-            extra += `\n🎣 Você recebeu: ${RODS[q.reward.rod].name}!`;
-            if (q.reward.rod === 'guardia') broadcast('announce', { text: `👑 ${player.name} conquistou a VARA DO GUARDIÃO!`, rarity: 'abissal' });
-          } else if (q.reward.rod) extra += '\n(Vara repetida — leve as moedas!) ';
+            extra += `\n🎣 ${recebeu}: ${itemName(lg, q.reward.rod, RODS[q.reward.rod].name)}!`;
+            if (q.reward.rod === 'guardia') {
+              announceAll((l2) => l2 === 'en'
+                ? `👑 ${player.name} earned the GUARDIAN'S ROD!`
+                : `👑 ${player.name} conquistou a VARA DO GUARDIÃO!`, 'abissal');
+            }
+          } else if (q.reward.rod) extra += trp(player, '\n(Vara repetida — leve as moedas!) ');
           if (q.reward.line && LINES[q.reward.line] && !pr.lines.includes(q.reward.line)) {
             pr.lines.push(q.reward.line);
             if (LINES[q.reward.line].drain < LINES[pr.line].drain) pr.line = q.reward.line;
-            extra += `\n🧵 Você recebeu: ${LINES[q.reward.line].name}!`;
+            extra += `\n🧵 ${recebeu}: ${itemName(lg, q.reward.line, LINES[q.reward.line].name)}!`;
           }
           if (q.reward.bait) {
             pr.baits[q.reward.bait.id] = (pr.baits[q.reward.bait.id] || 0) + q.reward.bait.n;
-            extra += `\n🪱 Você recebeu: ${BAITS[q.reward.bait.id].name} ×${q.reward.bait.n}!`;
+            extra += `\n🪱 ${recebeu}: ${itemName(lg, q.reward.bait.id, BAITS[q.reward.bait.id].name)} ×${q.reward.bait.n}!`;
           }
           st.idx++; st.prog = 0; st.zones = [];
           saveDirty = true;
           const next = chain[st.idx];
-          send(ws, 'dialog', { npc: npc.name,
-            text: `Missão cumprida! Tome ${q.reward.coins} moedas.${extra}` + (next ? `\n\nPróxima: ${next.text}` : '\n\nEra a última — obrigado!') });
+          const head = lg === 'en' ? `Quest complete! Take ${q.reward.coins} coins.` : `Missão cumprida! Tome ${q.reward.coins} moedas.`;
+          const tail = next
+            ? (lg === 'en' ? `\n\nNext: ${questText(lg, npc.id, st.idx, next)}` : `\n\nPróxima: ${next.text}`)
+            : trp(player, '\n\nEra a última — obrigado!');
+          send(ws, 'dialog', { npc: npc.name, text: head + extra + tail });
           send(ws, 'bought', { you: profileView(player) });
           broadcast('player_state', { player: publicState(player) }, ws);
         } else {
           saveDirty = true; // aceitou a missão (estado criado)
-          send(ws, 'dialog', { npc: npc.name, text: `${q.text}\n\nProgresso: ${prog}/${q.need}` });
+          const progLbl = lg === 'en' ? 'Progress' : 'Progresso';
+          send(ws, 'dialog', { npc: npc.name, text: `${questText(lg, npc.id, st.idx, q)}\n\n${progLbl}: ${prog}/${q.need}` });
           send(ws, 'bought', { you: profileView(player) });
         }
         break;
@@ -1060,7 +1214,7 @@ wss.on('connection', (ws) => {
         const d = drops.get(Number(msg.id));
         if (!d) break;
         if (Math.hypot(d.x - player.x, d.y - player.y) > 3 * WORLD.TILE) break;
-        if (pr.inventory.length >= INVENTORY_CAP) { send(ws, 'toast', { text: 'Balde cheio!' }); break; }
+        if (pr.inventory.length >= INVENTORY_CAP) { send(ws, 'toast', { text: trp(player, 'Balde cheio!') }); break; }
         drops.delete(d.id);
         pr.inventory.push(d.fish);
         if (d.fish.zone === 'tesouro') { // tesouro conta pra coleção (peixe de amigo não)
@@ -1070,7 +1224,9 @@ wss.on('connection', (ws) => {
         }
         saveDirty = true;
         broadcast('drop_del', { id: d.id });
-        send(ws, 'toast', { text: `Pegou ${d.fish.name} (${d.fish.weight} kg) de ${d.by}!` });
+        send(ws, 'toast', { text: langOf(player) === 'en'
+          ? `Picked up ${fishName('en', d.fish.fishId, d.fish.name)} (${d.fish.weight} kg) from ${d.by}!`
+          : `Pegou ${d.fish.name} (${d.fish.weight} kg) de ${d.by}!` });
         send(ws, 'bought', { you: profileView(player) });
         break;
       }
@@ -1097,9 +1253,9 @@ wss.on('connection', (ws) => {
         if (msg.kind !== 'bait') {
           const cur = { rod: pr.rod, line: pr.line, boat: pr.boat }[msg.kind];
           if (cur === msg.id) break;
-          if (pr.level < item.level) { send(ws, 'toast', { text: `Requer nível ${item.level}.` }); break; }
+          if (pr.level < item.level) { send(ws, 'toast', { text: langOf(player) === 'en' ? `Requires level ${item.level}.` : `Requer nível ${item.level}.` }); break; }
         }
-        if (pr.coins < item.price) { send(ws, 'toast', { text: 'Moedas insuficientes!' }); break; }
+        if (pr.coins < item.price) { send(ws, 'toast', { text: trp(player, 'Moedas insuficientes!') }); break; }
         // já tem? não deixa comprar duas vezes
         if ((msg.kind === 'rod' && pr.rods.includes(msg.id)) || (msg.kind === 'line' && pr.lines.includes(msg.id))
           || (msg.kind === 'boat' && pr.boats.includes(msg.id))) break;
@@ -1117,7 +1273,7 @@ wss.on('connection', (ws) => {
       case 'equip': { // troca o equipamento ativo (precisa possuir)
         const { kind, id } = msg;
         if (kind === 'boat' && id === null) { // desequipar barco (pra pegar carona)
-          if (player.boat) { send(ws, 'toast', { text: 'Atraque na terra antes de guardar o barco!' }); break; }
+          if (player.boat) { send(ws, 'toast', { text: trp(player, 'Atraque na terra antes de guardar o barco!') }); break; }
           pr.boat = null;
         }
         else if (kind === 'rod' && pr.rods.includes(id)) pr.rod = id;
@@ -1203,7 +1359,9 @@ wss.on('connection', (ws) => {
             .filter(id => !pr.quests[id] || pr.quests[id].idx < QUESTS[id].length);
           if (pending.length && !player.gm) {
             send(ws, 'dialog', { npc: 'Porta do Farol',
-              text: `A porta está selada por uma força antiga...\n\n"Somente quem ajudou TODOS os moradores do arquipélago pode entrar."\n\nMissões pendentes: ${pending.length} morador(es) ainda precisam de você.` });
+              text: langOf(player) === 'en'
+                ? `The door is sealed by an ancient force...\n\n"Only those who have helped EVERY islander may enter."\n\nPending quests: ${pending.length} islander(s) still need you.`
+                : `A porta está selada por uma força antiga...\n\n"Somente quem ajudou TODOS os moradores do arquipélago pode entrar."\n\nMissões pendentes: ${pending.length} morador(es) ainda precisam de você.` });
             break;
           }
           player.x = IN.spawnTx * TL + 8;

@@ -8,6 +8,62 @@ const ZOOM = 2;
 const VW = 480, VH = 270;
 const { W, H, TILE, T, WALK_OK, BOAT_OK, ISLANDS, NPCS, SPAWN, ZONE_NAMES, h2 } = WORLD;
 const MAP = WORLD.genWorld();
+
+// ---------------------------------------------------------------- idioma (PT é a fonte; EN via dicionário com fallback)
+let LANG = localStorage.getItem('lp_lang') === 'en' ? 'en' : 'pt';
+const EN_UI = {
+  '⌨️ Teclas padrão restauradas!': '⌨️ Default keys restored!',
+  '👕 Cor trocada!': '👕 Outfit color changed!',
+  '👕 Cor original!': '👕 Original color!',
+  'Conexão perdida. Recarregue a página.': 'Connection lost. Reload the page.',
+  '⛵ Você embarcou! Pesque à vontade — aperte E perto da terra pra descer.': '⛵ You hopped aboard! Fish away — press E near land to hop off.',
+  'Mire na água pra pescar!': 'Aim at the water to fish!',
+  'Encoste numa praia pra desembarcar.': 'Get close to a beach to disembark.',
+  '🎮 Controle desconectado': '🎮 Gamepad disconnected',
+  '🎮 Controle conectado: ': '🎮 Gamepad connected: ',
+  '[E] entrar': '[E] enter', '[E] pegar': '[E] take',
+  '🪣 Balde': '🪣 Bucket', '🎒 Equipamento': '🎒 Gear',
+  '🪣 Seu Balde': '🪣 Your Bucket', '🎒 Seu Equipamento': '🎒 Your Gear',
+  '🎣 Varas': '🎣 Rods', '🧵 Linhas': '🧵 Lines', '🪱 Iscas': '🪱 Baits', '⛵ Barcos': '⛵ Boats',
+  'equipado ✓': 'equipped ✓', 'equipar': 'equip', 'adquirido ✓': 'owned ✓', 'desequipar': 'unequip',
+  'Guardar o barco': 'Stow your boat',
+  'sem barco equipado você pode pegar carona no barco dos amigos': "with no boat equipped you can ride your friends' boats",
+  'Nenhum barco — compre no Capitão Nereu!': "No boats yet — buy one from Captain Nereu!",
+  'Balde vazio... vá pescar!': 'Bucket empty... go fish!',
+  'balde vazio': 'empty bucket',
+  '🚣 sem barco (compre no Capitão Nereu!)': "🚣 no boat (buy from Captain Nereu!)",
+  'nenhuma': 'none', 'Isca: ': 'Bait: ',
+  '👑 Você tem o melhor de tudo!': '👑 You own the best of everything!',
+  '🗑️ Tralhas': '🗑️ Junk', 'não capturado': 'not caught yet', 'recorde': 'record',
+  'aperte...': 'press...', ' no balde': ' in the bucket', 'SEGURE ESPAÇO': 'HOLD SPACE',
+  'Vender todos os peixes': 'Sell all fish', 'Vender': 'Sell',
+  'atrai peixes raros': 'attracts rare fish', 'mordidas mais rápidas': 'faster bites',
+  ' ✓ entregue!': ' ✓ turn it in!',
+  'Digite seu nick (3 a 16 caracteres).': 'Enter your nickname (3–16 characters).',
+  'O nick precisa de 3 a 16 caracteres.': 'The nickname needs 3–16 characters.',
+  'Esse email não parece válido.': "That email doesn't look valid.",
+  'Os emails não conferem.': "The emails don't match.",
+  'A senha precisa de pelo menos 6 caracteres.': 'The password needs at least 6 characters.',
+  'As senhas não conferem.': "The passwords don't match.",
+  'Você precisa aceitar os termos e condições.': 'You must accept the terms and conditions.',
+  'Não deu pra entrar. Tente de novo.': "Couldn't log in. Try again.",
+  '⚠️ Esse pescador ainda não tem senha! Complete o cadastro pra proteger seu progresso.': '⚠️ This angler has no password yet! Complete the sign-up to protect your progress.',
+  'Nick livre! Complete o cadastro pra criar sua conta.': 'Nickname available! Complete the sign-up to create your account.',
+  'Já tem conta? Entrar': 'Already have an account? Log in',
+  'Não tem conta? Criar uma agora': 'No account? Create one now',
+  '⬆ mover pra cima': '⬆ move up', '⬇ mover pra baixo': '⬇ move down',
+  '⬅ mover pra esquerda': '⬅ move left', '➡ mover pra direita': '➡ move right',
+  '🎣 pescar / fisgar': '🎣 cast / hook', '🗨️ interagir / embarcar': '🗨️ interact / board',
+  '📖 coleção': '📖 collection', '📜 missões': '📜 quests', '🪱 trocar isca': '🪱 switch bait', '🔊 som': '🔊 sound',
+};
+const TR = (s) => (LANG === 'en' ? (EN_UI[s] ?? s) : s);
+if (LANG === 'en') {
+  Object.assign(ZONE_NAMES, {
+    vila: 'Harbor Village', gelo: 'White Glacier', deserto: 'Dry Dune', savana: 'Golden Coast',
+    vulcao: 'Volcano Island', farol: 'Lighthouse Island', altomar: 'High Seas', tesouro: 'Secret Caves',
+  });
+  for (const isl of ISLANDS) if (ZONE_NAMES[isl.zone]) isl.name = ZONE_NAMES[isl.zone];
+}
 // pontos de passeio dos NPCs (mesma conta no servidor → posições idênticas pra todos)
 const NPC_SPOTS = {};
 for (const n of NPCS) NPC_SPOTS[n.id] = WORLD.npcWalkables(MAP, n);
@@ -94,6 +150,8 @@ const rTileAt = (tx, ty) => {
 let ws = null;
 let me = { id: 0, name: '', x: SPAWN.x, y: SPAWN.y, dir: 'down', moving: false, boat: false };
 let profile = null, catalog = null;
+let fishCat = null; // id -> espécie do catálogo (nomes já no idioma escolhido)
+const dispFish = (f) => { const c = fishCat && fishCat.get(f.fishId); return c ? c.name : f.name; };
 const others = new Map();
 const drops = new Map();
 
@@ -278,6 +336,75 @@ function closeModals() {
   $('dialog').style.display = 'none';
 }
 
+// tradução dos textos fixos do HTML (roda antes de qualquer painel abrir)
+function applyEnglishStatic() {
+  if (LANG !== 'en') return;
+  const set = (sel, prop, val) => { const el = document.querySelector(sel); if (el) el[prop] = val; };
+  set('#login p', 'textContent', 'explore the archipelago, hook legends, complete quests');
+  set('#login-name', 'placeholder', 'Your nickname');
+  set('#login-pass', 'placeholder', 'Password');
+  set('#login-btn', 'textContent', 'Set sail! ⚓');
+  set('#cad-name', 'placeholder', 'Nickname (3–16 letters)');
+  set('#cad-email', 'placeholder', 'Your email');
+  set('#cad-email2', 'placeholder', 'Repeat the email');
+  set('#cad-pass', 'placeholder', 'Password (min. 6)');
+  set('#cad-pass2', 'placeholder', 'Repeat the password');
+  set('#cad-btn', 'textContent', 'Create account & set sail! 🎣');
+  $('cad-terms').parentElement.querySelector('span').innerHTML =
+    'I have read and agree to the <a id="terms-link">terms and conditions</a>';
+  $('cad-news').parentElement.querySelector('span').textContent =
+    'I agree to receive game news by email';
+  set('#login-switch', 'textContent', 'No account? Create one now');
+  $('terms').innerHTML = `
+    <div class="xclose">✕</div>
+    <h2>📜 Terms & Conditions</h2>
+    <div style="font-size:12.5px; color:#cde; text-align:justify; display:flex; flex-direction:column; gap:8px">
+      <p><b>1. The game.</b> Lago Pixel is a free multiplayer fishing game, made for fun and not for profit. It may go offline, change or reset at any time, without notice.</p>
+      <p><b>2. Your account.</b> You are responsible for keeping your password safe. Nicknames are unique: first to register keeps it. Accounts may be removed in case of abuse (chat harassment, cheating, offensive names).</p>
+      <p><b>3. Your data.</b> We only store: nickname, email, password (encrypted) and game progress. Nothing is sold or shared with third parties. News emails are only sent if you opt in — and you can opt out anytime.</p>
+      <p><b>4. Removal.</b> Want your account and data deleted? Tell us in the game chat or by the admin's email, and we remove everything.</p>
+      <p><b>5. Tight lines!</b> Play fair, help the newbies and drop some fish for your friends. 🐟</p>
+    </div>`;
+  const invNote = document.querySelector('#invtab-bucket > div:last-child');
+  if (invNote) invNote.innerHTML = `Total: <b class="coins"><span id="invtotal">0</span> ${COIN}</b> — sell at any shop in the archipelago. "Drop" leaves the fish on the ground for a friend to grab!`;
+  const sellrow = document.querySelector('#shopsellrow > div');
+  if (sellrow) sellrow.firstChild.textContent = 'Sell all fish ';
+  set('#sellbtn', 'textContent', 'Sell');
+  const qh2 = document.querySelectorAll('#quests h2');
+  if (qh2[0]) qh2[0].textContent = '📜 Quests';
+  if (qh2[1]) qh2[1].textContent = '🏆 Achievements';
+  const qhint = document.querySelector('#quests > div[style]');
+  if (qhint) qhint.textContent = 'Talk to the islanders (E key) to accept and turn in quests.';
+  const dexh2 = document.querySelector('#dex h2');
+  if (dexh2) dexh2.firstChild.textContent = '📖 Fish Collection ';
+  set('#settings h2', 'textContent', '⚙️ Settings');
+  set('#settings h3', 'textContent', '⌨️ Controls');
+  set('#key-reset', 'textContent', 'Restore default keys');
+  const kinfo = $('key-reset').nextElementSibling;
+  if (kinfo) kinfo.innerHTML = 'SHIFT runs · ENTER opens the chat · ESC closes windows<br>🎮 Gamepad supported: stick/D-pad moves, A fishes, B interacts, RT turbo';
+  const clabel = $('colorrow').previousElementSibling;
+  if (clabel) clabel.textContent = '👕 Outfit color:';
+  set('#set-sound', 'textContent', '🔊 Sound: on');
+  set('#set-money', 'textContent', '💰 Show/hide the coin panel');
+  set('#set-logout', 'textContent', '🚪 Log out (switch angler)');
+  const tip = $('settings').lastElementChild;
+  if (tip) tip.textContent = 'Tip: ESC closes any window.';
+  const dclose = document.querySelector('#dialog .close');
+  if (dclose) dclose.textContent = '[E or ESC to close]';
+}
+applyEnglishStatic();
+
+// seletor de idioma (login) + botão nas configurações
+$('lang-pt').classList.toggle('sel', LANG !== 'en');
+$('lang-en').classList.toggle('sel', LANG === 'en');
+$('lang-pt').onclick = () => { if (LANG !== 'pt') { localStorage.setItem('lp_lang', 'pt'); location.reload(); } };
+$('lang-en').onclick = () => { if (LANG !== 'en') { localStorage.setItem('lp_lang', 'en'); location.reload(); } };
+$('set-lang').textContent = LANG === 'en' ? '🌐 Language: English' : '🌐 Idioma: Português';
+$('set-lang').onclick = () => {
+  localStorage.setItem('lp_lang', LANG === 'en' ? 'pt' : 'en');
+  location.reload();
+};
+
 // X de fechar em todos os painéis (essencial no celular)
 for (const el of document.querySelectorAll('.xclose')) {
   const close = (e) => { e.preventDefault(); e.stopPropagation(); el.closest('.modal').style.display = 'none'; };
@@ -291,7 +418,7 @@ $('btn-settings').addEventListener('click', () => togglePanel('settings'));
 $('btn-settings').addEventListener('touchstart', (e) => { e.preventDefault(); togglePanel('settings'); }, { passive: false });
 $('set-sound').onclick = () => {
   toggleAmbience();
-  $('set-sound').textContent = ambienceOn ? '🔊 Som: ligado' : '🔇 Som: desligado';
+  $('set-sound').textContent = LANG === 'en' ? (ambienceOn ? '🔊 Sound: on' : '🔇 Sound: off') : (ambienceOn ? '🔊 Som: ligado' : '🔇 Som: desligado');
 };
 
 // ---------------------------------------------------------------- teclas configuráveis
@@ -307,7 +434,7 @@ const KB_ACTIONS = [
   ['bait', '🪱 trocar isca'], ['sound', '🔊 som'],
 ];
 function keyLabel(code) {
-  if (code === 'Space') return 'ESPAÇO';
+  if (code === 'Space') return LANG === 'en' ? 'SPACE' : 'ESPAÇO';
   if (code.startsWith('Key')) return code.slice(3);
   if (code.startsWith('Digit')) return code.slice(5);
   return { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' }[code] || code;
@@ -319,11 +446,11 @@ function renderKeylist() {
     const row = document.createElement('div');
     row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:2px 0';
     const sp = document.createElement('span');
-    sp.textContent = label;
+    sp.textContent = TR(label);
     row.appendChild(sp);
     const b = document.createElement('button');
     b.className = 'btn small';
-    b.textContent = rebinding === act ? 'aperte...' : keyLabel(KB[act]);
+    b.textContent = rebinding === act ? TR('aperte...') : keyLabel(KB[act]);
     if (rebinding === act) b.style.background = '#8a6a1a';
     b.onclick = () => { rebinding = rebinding === act ? null : act; renderKeylist(); };
     row.appendChild(b);
@@ -335,7 +462,7 @@ $('key-reset').onclick = () => {
   localStorage.setItem('lp_keys', JSON.stringify(KB));
   rebinding = null;
   renderKeylist();
-  toast('⌨️ Teclas padrão restauradas!', 1600);
+  toast(TR('⌨️ Teclas padrão restauradas!'), 1600);
 };
 renderKeylist();
 // paleta de cores da roupa (fica salva no perfil do servidor)
@@ -350,7 +477,7 @@ renderKeylist();
       send({ type: 'set_color', hue: h });
       [...row.children].forEach(el => el.classList.remove('sel'));
       sw.classList.add('sel');
-      toast('👕 Cor trocada!', 1200);
+      toast(TR('👕 Cor trocada!'), 1200);
     };
     row.appendChild(sw);
   }
@@ -358,7 +485,7 @@ renderKeylist();
   orig.className = 'swatch';
   orig.style.background = 'conic-gradient(red, yellow, lime, cyan, blue, magenta, red)';
   orig.title = 'Cor original (pelo nome)';
-  orig.onclick = () => { send({ type: 'set_color', hue: null }); toast('👕 Cor original!', 1200); };
+  orig.onclick = () => { send({ type: 'set_color', hue: null }); toast(TR('👕 Cor original!'), 1200); };
   row.appendChild(orig);
 }
 $('set-money').onclick = () => {
@@ -397,9 +524,9 @@ function refreshHUD() {
   $('hud-coins').textContent = profile.coins.toLocaleString('pt-BR');
   $('xpfill').style.width = Math.min(100, 100 * profile.xp / profile.xpNext) + '%';
   $('hud-gear').textContent = `🎣 ${catalog.rods[profile.rod].name} · 🧵 ${catalog.lines[profile.line].name}`;
-  $('hud-boat').textContent = profile.boat ? `🚣 ${catalog.boats[profile.boat].name}` : '🚣 sem barco (compre no Capitão Nereu!)';
+  $('hud-boat').textContent = profile.boat ? `🚣 ${catalog.boats[profile.boat].name}` : TR('🚣 sem barco (compre no Capitão Nereu!)');
   const b = profile.activeBait;
-  $('hud-bait').textContent = 'Isca: ' + (b && profile.baits[b] > 0 ? `${catalog.baits[b].name} (${profile.baits[b]})` : 'nenhuma');
+  $('hud-bait').textContent = TR('Isca: ') + (b && profile.baits[b] > 0 ? `${catalog.baits[b].name} (${profile.baits[b]})` : TR('nenhuma'));
   $('hud-bucket').textContent = profile.inventory.length;
   refreshInventory(); refreshShop(); refreshDex(); refreshQuests(); refreshAchievements(); refreshMoneyGoal();
 }
@@ -428,9 +555,9 @@ function renderTabs(box, tabs, sel, onPick) {
 
 let invTab = 'bucket';
 function refreshInventory() {
-  renderTabs($('invtabs'), [['bucket', '🪣 Balde'], ['gear', '🎒 Equipamento']], invTab,
+  renderTabs($('invtabs'), [['bucket', TR('🪣 Balde')], ['gear', TR('🎒 Equipamento')]], invTab,
     (k) => { invTab = k; refreshInventory(); });
-  $('invtitle').textContent = invTab === 'bucket' ? '🪣 Seu Balde' : '🎒 Seu Equipamento';
+  $('invtitle').textContent = invTab === 'bucket' ? TR('🪣 Seu Balde') : TR('🎒 Seu Equipamento');
   $('invtab-bucket').style.display = invTab === 'bucket' ? 'block' : 'none';
   $('invtab-gear').style.display = invTab === 'gear' ? 'block' : 'none';
   if (invTab === 'gear') { refreshGear(); return; }
@@ -443,7 +570,7 @@ function refreshInventory() {
     row.className = 'fishrow';
     const r = catalog.rarities[f.rarity];
     const info = document.createElement('span');
-    info.innerHTML = `<span style="color:${r.color}">${f.name}</span> <span style="color:#9ab">${f.weight} kg</span>`;
+    info.innerHTML = `<span style="color:${r.color}">${dispFish(f)}</span> <span style="color:#9ab">${f.weight} kg</span>`;
     const right = document.createElement('span');
     right.innerHTML = `<b style="color:#ffd24a">${f.value} ${COIN}</b> `;
     const btn = document.createElement('button');
@@ -453,7 +580,7 @@ function refreshInventory() {
     row.appendChild(info); row.appendChild(right);
     list.appendChild(row);
   });
-  if (!profile.inventory.length) list.innerHTML = '<div class="fishrow">Balde vazio... vá pescar!</div>';
+  if (!profile.inventory.length) list.innerHTML = `<div class="fishrow">${TR('Balde vazio... vá pescar!')}</div>`;
   $('invtotal').textContent = total.toLocaleString('pt-BR');
 }
 
@@ -462,11 +589,15 @@ function refreshGear() {
   const box = $('invtab-gear');
   box.innerHTML = '';
   const groups = [
-    ['🎣 Varas', 'rod', catalog.rods, profile.rods, profile.rod],
-    ['🧵 Linhas', 'line', catalog.lines, profile.lines, profile.line],
-    ['⛵ Barcos', 'boat', catalog.boats, profile.boats, profile.boat],
+    [TR('🎣 Varas'), 'rod', catalog.rods, profile.rods, profile.rod],
+    [TR('🧵 Linhas'), 'line', catalog.lines, profile.lines, profile.line],
+    [TR('⛵ Barcos'), 'boat', catalog.boats, profile.boats, profile.boat],
   ];
-  const descs = {
+  const descs = LANG === 'en' ? {
+    rod: (i) => `luck +${i.luck}`,
+    line: (i) => `fish escapes ${Math.round((1 - i.drain) * 100)}% less`,
+    boat: (i) => `speed ${i.speed}x · ${i.seats} seat${i.seats === 1 ? '' : 's'}`,
+  } : {
     rod: (i) => `sorte +${i.luck}`,
     line: (i) => `peixe escapa ${Math.round((1 - i.drain) * 100)}% menos`,
     boat: (i) => `velocidade ${i.speed}x · ${i.seats} carona${i.seats > 1 ? 's' : ''}`,
@@ -479,7 +610,7 @@ function refreshGear() {
     if (!ids.length) {
       const el = document.createElement('div');
       el.className = 'fishrow';
-      el.textContent = kind === 'boat' ? 'Nenhum barco — compre no Capitão Nereu!' : '—';
+      el.textContent = kind === 'boat' ? TR('Nenhum barco — compre no Capitão Nereu!') : '—';
       box.appendChild(el);
       continue;
     }
@@ -489,11 +620,11 @@ function refreshGear() {
       el.className = 'shopitem';
       el.innerHTML = `<div>${item.name} <div class="desc">${descs[kind](item)}</div></div>`;
       if (eqId === id) {
-        el.innerHTML += '<span class="owned">equipado ✓</span>';
+        el.innerHTML += `<span class="owned">${TR('equipado ✓')}</span>`;
       } else {
         const btn = document.createElement('button');
         btn.className = 'btn';
-        btn.textContent = 'equipar';
+        btn.textContent = TR('equipar');
         btn.onclick = () => send({ type: 'equip', kind, id });
         el.appendChild(btn);
       }
@@ -502,10 +633,10 @@ function refreshGear() {
     if (kind === 'boat' && profile.boat) { // guardar o barco = andar livre e pegar carona
       const el = document.createElement('div');
       el.className = 'shopitem';
-      el.innerHTML = '<div>Guardar o barco <div class="desc">sem barco equipado você pode pegar carona no barco dos amigos</div></div>';
+      el.innerHTML = `<div>${TR('Guardar o barco')} <div class="desc">${TR('sem barco equipado você pode pegar carona no barco dos amigos')}</div></div>`;
       const btn = document.createElement('button');
       btn.className = 'btn';
-      btn.textContent = 'desequipar';
+      btn.textContent = TR('desequipar');
       btn.onclick = () => send({ type: 'equip', kind: 'boat', id: null });
       el.appendChild(btn);
       box.appendChild(el);
@@ -660,7 +791,7 @@ function refreshDex() {
     const pool = catalog.fish.filter(f => z === '*' ? f.zones[0] === '*' : (f.zones[0] !== '*' && f.zones.includes(z)));
     if (!pool.length) continue;
     const h = document.createElement('h3');
-    h.textContent = z === '*' ? '🗑️ Tralhas' : '📍 ' + ZONE_NAMES[z];
+    h.textContent = z === '*' ? TR('🗑️ Tralhas') : '📍 ' + ZONE_NAMES[z];
     list.appendChild(h);
     const grid = document.createElement('div');
     grid.className = 'dexgrid';
@@ -672,8 +803,8 @@ function refreshDex() {
       el.appendChild(fishIcon(f.id, r.color, !!d));
       const info = document.createElement('div');
       info.innerHTML = d
-        ? `<div class="nm" style="color:${r.color}">${f.name}</div><div class="st">${r.label} · ${d.n}x · recorde ${d.best} kg</div>`
-        : `<div class="nm" style="color:#456">???</div><div class="st">${r.label} · não capturado</div>`;
+        ? `<div class="nm" style="color:${r.color}">${f.name}</div><div class="st">${r.label} · ${d.n}x · ${TR('recorde')} ${d.best} kg</div>`
+        : `<div class="nm" style="color:#456">???</div><div class="st">${r.label} · ${TR('não capturado')}</div>`;
       el.appendChild(info);
       grid.appendChild(el);
     }
@@ -706,12 +837,12 @@ function refreshQuests() {
     const el = document.createElement('div');
     el.className = 'questitem';
     if (!qs) {
-      el.innerHTML = `<span class="npc">${npc.name}</span> — ${island.name}<br><span style="color:#9ab">Visite pra receber uma missão. (${chain.length} missões)</span>`;
+      el.innerHTML = `<span class="npc">${npc.name}</span> — ${island.name}<br><span style="color:#9ab">${LANG === 'en' ? `Visit to receive a quest. (${chain.length} quests)` : `Visite pra receber uma missão. (${chain.length} missões)`}</span>`;
     } else if (qs.allDone) {
-      el.innerHTML = `<span class="npc">${npc.name}</span> — ${island.name}<br><span class="prog">✓ Todas as ${chain.length} missões concluídas!</span>`;
+      el.innerHTML = `<span class="npc">${npc.name}</span> — ${island.name}<br><span class="prog">${LANG === 'en' ? `✓ All ${chain.length} quests complete!` : `✓ Todas as ${chain.length} missões concluídas!`}</span>`;
     } else {
       el.innerHTML = `<span class="npc">${npc.name}</span> — ${island.name} <span style="color:#9ab">(${qs.idx + 1}/${qs.total})</span><br>` +
-        `${qs.q.text} <span class="prog">${qs.prog}/${qs.q.need}${qs.done ? ' ✓ entregue!' : ''}</span>` +
+        `${qs.q.text} <span class="prog">${qs.prog}/${qs.q.need}${qs.done ? TR(' ✓ entregue!') : ''}</span>` +
         `<div class="questbar"><div style="width:${100 * qs.prog / qs.q.need}%"></div></div>`;
     }
     list.appendChild(el);
@@ -723,22 +854,27 @@ function shopSection(box, title, kind, items, ownedId) {
   for (const [id, item] of Object.entries(items)) {
     const el = document.createElement('div');
     el.className = 'shopitem';
-    const descs = {
+    const descs = LANG === 'en' ? {
+      rod: `luck +${item.luck} · bigger bar · level ${item.level}+`,
+      line: `fish escapes ${Math.round((1 - item.drain) * 100)}% less · level ${item.level}+`,
+      boat: `speed ${item.speed}x · ${item.seats} seat${item.seats === 1 ? '' : 's'} · level ${item.level}+`,
+      bait: item.luckBonus ? 'attracts rare fish' : 'faster bites',
+    } : {
       rod: `sorte +${item.luck} · barra maior · nível ${item.level}+`,
       line: `peixe escapa ${Math.round((1 - item.drain) * 100)}% menos · nível ${item.level}+`,
       boat: `velocidade ${item.speed}x · ${item.seats} carona${item.seats > 1 ? 's' : ''} · nível ${item.level}+`,
       bait: item.luckBonus ? 'atrai peixes raros' : 'mordidas mais rápidas',
     };
-    el.innerHTML = `<div>${item.name}${kind === 'bait' ? ` ×${item.pack}` : ''} <div class="desc">${descs[kind]}${kind === 'bait' ? ` · você tem ${profile.baits[id] || 0}` : ''}</div></div>`;
+    el.innerHTML = `<div>${item.name}${kind === 'bait' ? ` ×${item.pack}` : ''} <div class="desc">${descs[kind]}${kind === 'bait' ? `${LANG === 'en' ? ' · you have ' : ' · você tem '}${profile.baits[id] || 0}` : ''}</div></div>`;
     const ownedIds = { rod: profile.rods, line: profile.lines, boat: profile.boats }[kind] || [];
     if (kind !== 'bait' && (ownedId === id || ownedIds.includes(id))) {
       // o lojista só vende — equipar é no seu inventário (🪣 → 🎒 Equipamento)
-      el.innerHTML += '<span class="owned">adquirido ✓</span>';
+      el.innerHTML += `<span class="owned">${TR('adquirido ✓')}</span>`;
     } else {
       const btn = document.createElement('button');
       btn.className = 'btn';
       const locked = kind !== 'bait' && profile.level < item.level;
-      if (locked) btn.textContent = `nível ${item.level} 🔒`;
+      if (locked) btn.textContent = (LANG === 'en' ? 'level ' : 'nível ') + item.level + ' 🔒';
       else btn.innerHTML = item.price.toLocaleString('pt-BR') + ' ' + COIN;
       btn.disabled = locked || profile.coins < item.price;
       btn.onclick = () => send({ type: 'buy', kind, id });
@@ -750,12 +886,12 @@ function shopSection(box, title, kind, items, ownedId) {
 
 let shopStock = null; // { title, stock: { rod: [], line: [], bait: [], boat: [] } } — vem do servidor
 let shopTab = null;
-const SHOP_TABS = [['rod', '🎣 Varas'], ['line', '🧵 Linhas'], ['bait', '🪱 Iscas'], ['boat', '⛵ Barcos']];
+const SHOP_TABS = [['rod', TR('🎣 Varas')], ['line', TR('🧵 Linhas')], ['bait', TR('🪱 Iscas')], ['boat', TR('⛵ Barcos')]];
 function refreshShop() {
   if (!shopStock) return;
   const total = profile.inventory.reduce((s, f) => s + f.value, 0);
   $('selldesc').textContent = profile.inventory.length
-    ? `${profile.inventory.length} peixes = ${total.toLocaleString('pt-BR')} moedas` : 'balde vazio';
+    ? (LANG === 'en' ? `${profile.inventory.length} fish = ${total.toLocaleString('pt-BR')} coins` : `${profile.inventory.length} peixes = ${total.toLocaleString('pt-BR')} moedas`) : TR('balde vazio');
   $('sellbtn').disabled = !profile.inventory.length;
   $('shoptitle').textContent = shopStock.title;
   $('shopsellrow').style.display = 'flex'; // todo vendedor compra peixe
@@ -764,10 +900,10 @@ function refreshShop() {
   if (!tabs.some(([k]) => k === shopTab)) shopTab = tabs.length ? tabs[0][0] : 'rod';
   renderTabs($('shoptabs'), tabs, shopTab, (k) => { shopTab = k; refreshShop(); });
   const sections = {
-    rod: [$('shoprods'), '🎣 Varas', catalog.rods, profile.rod],
-    line: [$('shoplines'), '🧵 Linhas', catalog.lines, profile.line],
-    bait: [$('shopbaits'), '🪱 Iscas', catalog.baits, null],
-    boat: [$('shopboats'), '⛵ Barcos', catalog.boats, profile.boat],
+    rod: [$('shoprods'), TR('🎣 Varas'), catalog.rods, profile.rod],
+    line: [$('shoplines'), TR('🧵 Linhas'), catalog.lines, profile.line],
+    bait: [$('shopbaits'), TR('🪱 Iscas'), catalog.baits, null],
+    boat: [$('shopboats'), TR('⛵ Barcos'), catalog.boats, profile.boat],
   };
   for (const [k, [el]] of Object.entries(sections)) el.style.display = k === shopTab ? 'block' : 'none';
   const [box, title, allItems, eq] = sections[shopTab];
@@ -806,12 +942,12 @@ function refreshMoneyGoal() {
     }
   }
   const el = $('money-goal');
-  if (!best) { el.textContent = '👑 Você tem o melhor de tudo!'; return; }
+  if (!best) { el.textContent = TR('👑 Você tem o melhor de tudo!'); return; }
   const falta = best.price - profile.coins;
   const place = catalog.where[best.kind + ':' + best.id];
   el.innerHTML = falta > 0
-    ? `Faltam ${falta.toLocaleString('pt-BR')} ${COIN} → ${best.name}`
-    : `💡 ${best.name} à venda: ${place}`;
+    ? (LANG === 'en' ? `Need ${falta.toLocaleString('pt-BR')} ${COIN} → ${best.name}` : `Faltam ${falta.toLocaleString('pt-BR')} ${COIN} → ${best.name}`)
+    : `💡 ${best.name} ${LANG === 'en' ? 'for sale at' : 'à venda:'} ${place}`;
 }
 
 $('sellbtn').onclick = () => send({ type: 'sell_all' });
@@ -821,35 +957,36 @@ $('sellbtn').onclick = () => send({ type: 'sell_all' });
 function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
 
 function tryJoin(payload) {
-  if (ws && ws.readyState === 1) send({ type: 'join', ...payload });
+  if (ws && ws.readyState === 1) send({ type: 'join', lang: LANG, ...payload });
   else connect(payload);
 }
 
 function connect(payload) {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   ws = new WebSocket(`${proto}//${location.host}`);
-  ws.onopen = () => send({ type: 'join', ...payload });
-  ws.onclose = () => toast('Conexão perdida. Recarregue a página.', 60000);
+  ws.onopen = () => send({ type: 'join', lang: LANG, ...payload });
+  ws.onclose = () => toast(TR('Conexão perdida. Recarregue a página.'), 60000);
   ws.onmessage = (ev) => {
     const m = JSON.parse(ev.data);
     switch (m.type) {
       case 'auth_error':
         localStorage.removeItem('lp_token');
         $('login').style.display = 'flex';
-        lgMsg(m.text || 'Não deu pra entrar. Tente de novo.');
+        lgMsg(m.text || TR('Não deu pra entrar. Tente de novo.'));
         break;
       case 'need_register':
         $('login').style.display = 'flex';
         setCadMode(true, m.name);
         lgMsg(m.legacy
-          ? '⚠️ Esse pescador ainda não tem senha! Complete o cadastro pra proteger seu progresso.'
-          : 'Nick livre! Complete o cadastro pra criar sua conta.');
+          ? TR('⚠️ Esse pescador ainda não tem senha! Complete o cadastro pra proteger seu progresso.')
+          : TR('Nick livre! Complete o cadastro pra criar sua conta.'));
         break;
       case 'welcome':
         if (m.token) localStorage.setItem('lp_token', m.token);
         lgMsg('');
         me.id = m.id; me.name = m.name;
         profile = m.you; catalog = m.catalog;
+        fishCat = new Map(catalog.fish.map((x) => [x.id, x]));
         timeOffset = m.timeOffset || 0; dayLen = m.dayLen || 1200; luckEvent = !!m.event;
         evZones.length = 0;
         if (m.zones) for (const z of m.zones) evZones.push(z);
@@ -870,7 +1007,7 @@ function connect(payload) {
         me.riding = m.owner; me.seat = m.seat;
         fish.phase = 'idle';
         sfx.boat();
-        toast('⛵ Você embarcou! Pesque à vontade — aperte E perto da terra pra descer.', 3200);
+        toast(TR('⛵ Você embarcou! Pesque à vontade — aperte E perto da terra pra descer.'), 3200);
         break;
       case 'ride_end':
         me.riding = null;
@@ -908,9 +1045,9 @@ function connect(payload) {
         refreshHUD();
         break;
       case 'escaped': fish.phase = 'idle'; reel = null; toast(m.reason); sfx.fail(); break;
-      case 'sold': profile = m.you; refreshHUD(); sfx.coin(); toast(`Vendeu tudo por ${m.total.toLocaleString('pt-BR')} moedas!`); break;
+      case 'sold': profile = m.you; refreshHUD(); sfx.coin(); toast(LANG === 'en' ? `Sold everything for ${m.total.toLocaleString('pt-BR')} coins!` : `Vendeu tudo por ${m.total.toLocaleString('pt-BR')} moedas!`); break;
       case 'bought': profile = m.you; refreshHUD(); break;
-      case 'levelup': sfx.level(); toast(`⭐ Nível ${m.level}!`); confetti(); break;
+      case 'levelup': sfx.level(); toast((LANG === 'en' ? '⭐ Level ' : '⭐ Nível ') + m.level + '!'); confetti(); break;
       case 'toast': toast(m.text); break;
       case 'announce': announce(m.text, m.rarity); break;
       case 'open_shop':
@@ -986,7 +1123,7 @@ addEventListener('keyup', (e) => { keys[e.code] = false; });
 function tryCast() {
   const [dx, dy] = DIRV[me.dir];
   const bx = me.x + dx * TILE * 2.4, by = me.y + dy * TILE * 2.4;
-  if (!isWaterPx(bx, by)) { toast('Mire na água pra pescar!'); return; }
+  if (!isWaterPx(bx, by)) { toast(TR('Mire na água pra pescar!')); return; }
   send({ type: 'cast', bobX: Math.round(bx), bobY: Math.round(by) });
   sfx.cast();
 }
@@ -1070,7 +1207,7 @@ function interact() {
         return;
       }
     }
-    toast('Encoste numa praia pra desembarcar.');
+    toast(TR('Encoste numa praia pra desembarcar.'));
   }
 }
 
@@ -1164,11 +1301,11 @@ if (IS_TOUCH) {
 
 let gpPrev = [], gpVec = { x: 0, y: 0 }, gpSprint = false, gpA = false;
 addEventListener('gamepadconnected', (e) => {
-  toast(`🎮 Controle conectado: ${e.gamepad.id.slice(0, 34)}`, 3000);
+  toast(TR('🎮 Controle conectado: ') + e.gamepad.id.slice(0, 34), 3000);
 });
 addEventListener('gamepaddisconnected', () => {
   gpVec.x = gpVec.y = 0; gpSprint = false; gpA = false;
-  toast('🎮 Controle desconectado');
+  toast(TR('🎮 Controle desconectado'));
 });
 
 function anyModalOpen() {
@@ -1217,7 +1354,7 @@ function setCadMode(on, presetNick) {
   cadMode = on;
   $('lg-entrar').style.display = on ? 'none' : 'block';
   $('lg-cad').style.display = on ? 'block' : 'none';
-  $('login-switch').textContent = on ? 'Já tem conta? Entrar' : 'Não tem conta? Criar uma agora';
+  $('login-switch').textContent = on ? TR('Já tem conta? Entrar') : TR('Não tem conta? Criar uma agora');
   if (presetNick !== undefined) $('cad-name').value = presetNick;
 }
 $('login-switch').onclick = () => { setCadMode(!cadMode); lgMsg(''); };
@@ -1249,7 +1386,7 @@ function startAudio() {
 
 function doLogin() {
   const name = $('login-name').value.trim();
-  if (name.length < 3) { lgMsg('Digite seu nick (3 a 16 caracteres).'); return; }
+  if (name.length < 3) { lgMsg(TR('Digite seu nick (3 a 16 caracteres).')); return; }
   localStorage.setItem('lp_name', name);
   startAudio();
   tryJoin({ name, pass: $('login-pass').value });
@@ -1260,12 +1397,12 @@ function doRegister() {
   const email = $('cad-email').value.trim();
   const email2 = $('cad-email2').value.trim();
   const pass = $('cad-pass').value, pass2 = $('cad-pass2').value;
-  if (name.length < 3) { lgMsg('O nick precisa de 3 a 16 caracteres.'); return; }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { lgMsg('Esse email não parece válido.'); return; }
-  if (email.toLowerCase() !== email2.trim().toLowerCase()) { lgMsg('Os emails não conferem.'); return; }
-  if (pass.length < 6) { lgMsg('A senha precisa de pelo menos 6 caracteres.'); return; }
-  if (pass !== pass2) { lgMsg('As senhas não conferem.'); return; }
-  if (!$('cad-terms').checked) { lgMsg('Você precisa aceitar os termos e condições.'); return; }
+  if (name.length < 3) { lgMsg(TR('O nick precisa de 3 a 16 caracteres.')); return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { lgMsg(TR('Esse email não parece válido.')); return; }
+  if (email.toLowerCase() !== email2.trim().toLowerCase()) { lgMsg(TR('Os emails não conferem.')); return; }
+  if (pass.length < 6) { lgMsg(TR('A senha precisa de pelo menos 6 caracteres.')); return; }
+  if (pass !== pass2) { lgMsg(TR('As senhas não conferem.')); return; }
+  if (!$('cad-terms').checked) { lgMsg(TR('Você precisa aceitar os termos e condições.')); return; }
   localStorage.setItem('lp_name', name);
   startAudio();
   tryJoin({ name, register: { email, pass, news: $('cad-news').checked, terms: true } });
@@ -2215,7 +2352,7 @@ function drawDecor(d, time) {
       const tw = 0.5 + 0.5 * Math.sin(time * 2.4 + d.v * 9);
       ctx.fillStyle = `rgba(140,220,255,${0.25 + tw * 0.3})`;
       ctx.fillRect(cx - 1, by - 6 + tw * 2, 2, 2);
-      if (Math.hypot(d.x - me.x, d.y - me.y) < 48) drawLabel(cx, by - 32, '[E] entrar', '#7affc8');
+      if (Math.hypot(d.x - me.x, d.y - me.y) < 48) drawLabel(cx, by - 32, TR('[E] entrar'), '#7affc8');
       break;
     }
     case 'house': {
@@ -2349,7 +2486,7 @@ function drawDecor(d, time) {
       ctx.fillStyle = '#ffd24a'; ctx.fillRect(bx + 1.6, by - 3.5, 1.6, 1.6);
       ctx.fillStyle = '#3a3a44'; ctx.fillRect(bx - 2, by - 15, 4, 2.6);
       ctx.fillStyle = '#ffe9a0'; ctx.fillRect(bx - 1.2, by - 14.4, 2.4, 1.6);
-      if (Math.hypot(bx - me.x, by - me.y) < 52) drawLabel(bx, by - 20, '[E] entrar', '#7affc8');
+      if (Math.hypot(bx - me.x, by - me.y) < 52) drawLabel(bx, by - 20, TR('[E] entrar'), '#7affc8');
       // galeria + lanterna
       const ly = by - 65;
       ctx.fillStyle = '#3a3a44'; ctx.fillRect(bx - 9, ly, 18, 3);
@@ -3281,7 +3418,7 @@ function drawReel() {
   ctx.beginPath(); ctx.roundRect(bx - 16, by - 38, 104, bh + 70, 10); ctx.fill();
   ctx.strokeStyle = r.color; ctx.lineWidth = 2; ctx.stroke(); // borda na cor da raridade
   ctx.fillStyle = '#cde'; ctx.font = 'bold 12px monospace'; ctx.textAlign = 'center';
-  ctx.fillText('SEGURE ESPAÇO', bx + 36, by - 18);
+  ctx.fillText(TR('SEGURE ESPAÇO'), bx + 36, by - 18);
   ctx.fillStyle = r.color; ctx.font = 'bold 10px monospace';
   if (catalog && catalog.rarities[r.rarity]) ctx.fillText(catalog.rarities[r.rarity].label.toUpperCase(), bx + 36, by + bh + 22);
   ctx.fillStyle = '#101f30'; ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 6); ctx.fill();
@@ -3331,12 +3468,12 @@ function drawCatchCard(now) {
   // foto no alto, ao lado do nome (sem invadir a linha de raridade/peso)
   ctx.drawImage(fishIcon(f.fishId, r.color, true), cx - 152, cy - 43, 60, 32);
   ctx.fillStyle = r.color; ctx.font = 'bold 17px monospace';
-  ctx.fillText(f.name, cx + 20, cy - 20);
+  ctx.fillText(dispFish(f), cx + 20, cy - 20);
   ctx.fillStyle = '#ccc'; ctx.font = '13px monospace';
   ctx.fillText(`${r.label} · ${f.weight} kg · ${ZONE_NAMES[f.zone]}`, cx, cy + 6);
   ctx.fillStyle = '#ffd24a'; ctx.font = 'bold 14px monospace';
   { // moeda desenhada no canvas (emoji falha em muitos aparelhos)
-    const t1 = `+${f.value.toLocaleString('pt-BR')} `, t2 = ' no balde';
+    const t1 = `+${f.value.toLocaleString('pt-BR')} `, t2 = TR(' no balde');
     const w1 = ctx.measureText(t1).width, w2 = ctx.measureText(t2).width, cw = 13;
     let x0 = cx - (w1 + cw + w2) / 2;
     ctx.textAlign = 'left';
@@ -3519,7 +3656,7 @@ function frame_(now) {
       drawShadow(d.x, d.y + 4, 7 * s, 2.2 * s);
       ctx.drawImage(fishIcon(d.fish.fishId, r.color, true), d.x - 15 * s, d.y - 8 * s + bob, 30 * s, 16 * s);
       if (Math.hypot(d.x - me.x, d.y - me.y) < 40 + 12 * s) {
-        drawLabel(d.x, d.y - 10 - 8 * s, `[E] pegar · ${d.fish.weight} kg`, '#7affc8');
+        drawLabel(d.x, d.y - 10 - 8 * s, `${TR('[E] pegar')} · ${d.fish.weight} kg`, '#7affc8');
       }
     }
 
@@ -3571,12 +3708,12 @@ function frame_(now) {
         if (rodBehind) drawFishingRodAndLine(p, false, time, now);
         drawChar(p.x, p.y, p.dir, p.name, pMoving, time, p.boat ? (p.boatT || 'remo') : false, !!p.fishing, null, p.hue, !!p.riding);
         if (p.sayFx && now < p.sayFx.until) drawSpeech(p.x, p.y - (p.boat ? 40 : 36), p.sayFx.text);
-        else drawLabel(p.x, p.y - (p.boat ? 38 : 34), showName ? p.name : `Nível ${p.level}`, showName ? '#fff' : '#ffd88a');
+        else drawLabel(p.x, p.y - (p.boat ? 38 : 34), showName ? p.name : (LANG === 'en' ? `Level ${p.level}` : `Nível ${p.level}`), showName ? '#fff' : '#ffd88a');
         if (!rodBehind) drawFishingRodAndLine(p, false, time, now);
         if (p.catchFx) {
           const age = (now - p.catchFx.t) / 1000;
           if (age > 2.4) p.catchFx = null;
-          else drawLabel(p.x, p.y - 40 - age * 10, p.catchFx.fish.name + '!', catalog.rarities[p.catchFx.fish.rarity].color);
+          else drawLabel(p.x, p.y - 40 - age * 10, dispFish(p.catchFx.fish) + '!', catalog.rarities[p.catchFx.fish.rarity].color);
         }
       } else {
         const rodBehind = me.dir === 'up';
