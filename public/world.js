@@ -39,12 +39,16 @@
     { id: 'ilo',      name: 'Ismael',           role: 'quest', island: 'farol',   tx: 397, ty: 304 },
     { id: 'nanuk',    name: 'Nanuk',            role: 'quest', island: 'gelo',    tx: 140, ty: 111 },
     { id: 'kira',     name: 'Kira',             role: 'quest', island: 'gelo',    tx: 150, ty: 121 },
+    { id: 'iluq',     name: 'Iluq',             role: 'shop',  island: 'gelo',    tx: 145, ty: 116 },
     { id: 'omar',     name: 'Sheik Omar',       role: 'quest', island: 'deserto', tx: 620, ty: 121 },
     { id: 'zahra',    name: 'Zahra',            role: 'quest', island: 'deserto', tx: 610, ty: 131 },
+    { id: 'rashid',   name: 'Rashid',           role: 'shop',  island: 'deserto', tx: 625, ty: 124 },
     { id: 'adama',    name: 'Adama',            role: 'quest', island: 'savana',  tx: 640, ty: 471 },
     { id: 'kofi',     name: 'Kofi',             role: 'quest', island: 'savana',  tx: 652, ty: 461 },
+    { id: 'ayo',      name: 'Ayo',              role: 'shop',  island: 'savana',  tx: 645, ty: 466 },
     { id: 'vulcana',  name: 'Vulcana',          role: 'quest', island: 'vulcao',  tx: 408, ty: 523 },
     { id: 'brasa',    name: 'Bruno Brasa',      role: 'quest', island: 'vulcao',  tx: 392, ty: 528 },
+    { id: 'magda',    name: 'Magda',            role: 'shop',  island: 'vulcao',  tx: 400, ty: 527 },
     { id: 'guardiao', name: 'Guardião do Farol', role: 'quest', island: 'farol',  tx: 13,  ty: 11 },
   ];
 
@@ -163,18 +167,18 @@
     }
 
     // 4) vila: praça, casas, ruas e cais
-    const vila = ISLANDS.find(i => i.id === 'vila');
-    const vx = vila.cx, vy = vila.cy;
-    for (let y = vy - 12; y <= vy + 10; y++) for (let x = vx - 17; x <= vx + 17; x++) {
-      if (!isWater(at(x, y))) set(x, y, T.GRASS);
-    }
     const house = (hx, hy) => {
       for (let x = 0; x < 5; x++) { set(hx + x, hy, T.ROOF); set(hx + x, hy + 1, T.ROOF); }
       for (let x = 0; x < 5; x++) { set(hx + x, hy + 2, T.WALL); set(hx + x, hy + 3, T.WALL); }
       set(hx + 2, hy + 3, T.DOOR);
     };
+    const vila = ISLANDS.find(i => i.id === 'vila');
+    const vx = vila.cx, vy = vila.cy;
+    for (let y = vy - 12; y <= vy + 10; y++) for (let x = vx - 17; x <= vx + 17; x++) {
+      if (!isWater(at(x, y))) set(x, y, T.GRASS);
+    }
     house(vx - 14, vy - 10); house(vx - 3, vy - 10); house(vx + 8, vy - 10);
-    house(vx - 14, vy + 2); house(vx + 8, vy + 2);
+    house(vx - 14, vy + 2); house(vx + 8, vy + 6); // a última fica ao sul da estrada do cais
     for (let y = vy - 4; y <= vy + 9; y++) set(vx, y, T.PATH);
     for (let x = vx - 12; x <= vx + 12; x++) set(x, vy - 3, T.PATH);
     // da praça até a praia: estrada de terra; só o trecho final (areia + mar) é deque de madeira
@@ -182,6 +186,12 @@
     while (shoreX < W - 1 && !isWater(at(shoreX, vy + 4))) shoreX++;
     for (let x = vx + 2; x < shoreX - 5; x++) { set(x, vy + 4, T.PATH); set(x, vy + 5, T.PATH); }
     for (let x = shoreX - 5; x < shoreX + 9; x++) { set(x, vy + 4, T.PLANK); set(x, vy + 5, T.PLANK); }
+
+    // 4b) vilarejos nas outras ilhas (o cliente desenha a arquitetura pelo tema)
+    house(133, 103); house(146, 102);   // Geleira: iglus
+    house(622, 108); house(628, 116);   // Duna: tendas do bazar
+    house(634, 461); house(644, 455);   // Costa Dourada: palhoças
+    house(386, 518); house(408, 514);   // Vulcão: casas de pedra
 
     // 5) farol (torre 3x2 que bloqueia; o cliente desenha a torre por cima)
     const far = ISLANDS.find(i => i.id === 'farol');

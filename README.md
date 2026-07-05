@@ -30,10 +30,10 @@ Pra jogar pela internet: `cloudflared tunnel --url http://localhost:3000` (grát
 ## O arquipélago
 
 - **Vila do Cais** — spawn, loja do Teodoro, missões da Beatriz
-- **Geleira Branca** (NO) — peixes árticos, missões do Nanuk
-- **Duna Seca** (NE) — oásis no deserto, missões do Sheik Omar
-- **Costa Dourada** (SE) — savana, missões do Adama
-- **Ilha do Vulcão** (S) — cratera de lava, missões da Vulcana
+- **Geleira Branca** (NO) — peixes árticos, missões do Nanuk, empório do Iluq (iglus)
+- **Duna Seca** (NE) — oásis no deserto, missões do Sheik Omar, bazar do Rashid (tendas)
+- **Costa Dourada** (SE) — savana, missões do Adama, palhoça do Ayo
+- **Ilha do Vulcão** (S) — cratera de lava, missões da Vulcana, forja da Magda
 - **Alto-Mar** — entre as ilhas, só de barco, peixes grandes
 
 Cada zona tem espécies próprias (comuns → lendárias). Barcos, varas, linhas e

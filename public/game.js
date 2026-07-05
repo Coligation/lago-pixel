@@ -55,10 +55,11 @@ for (let ty = 0; ty < H; ty++) for (let tx = 0; tx < W; tx++) {
   // casas da vila (5x4 tiles) viram sprites inteiros com telhado projetado "3D"
   if (t === T.ROOF && tileAt(tx - 1, ty) !== T.ROOF && tileAt(tx, ty - 1) !== T.ROOF
       && tileAt(tx + 1, ty) === T.ROOF && tileAt(tx, ty + 2) === T.WALL) {
+    const theme = WORLD.nearestIsland(tx, ty).isl.theme;
     for (let yy = 0; yy < 4; yy++) for (let xx = 0; xx < 5; xx++) {
-      RENDER_MAP[(ty + yy) * W + tx + xx] = T.GRASS;
+      RENDER_MAP[(ty + yy) * W + tx + xx] = THEME_GROUND[theme];
     }
-    DECOR.push({ type: 'house', x: tx * TILE, y: (ty + 4) * TILE, v: h2(tx, ty), smokeT: 0 });
+    DECOR.push({ type: 'house', x: tx * TILE, y: (ty + 4) * TILE, v: h2(tx, ty), smokeT: 0, th: theme });
   }
   if (t === T.PLANK && isWaterT(tileAt(tx, ty + 1)) && h2(tx, ty) > 0.45) {
     DECOR.push({ type: 'post', x: tx * TILE + 8, y: ty * TILE + 17, v: h2(tx, ty) });
@@ -657,18 +658,21 @@ function shopSection(box, title, kind, items, ownedId) {
   }
 }
 
-let shopMode = 'itens'; // 'itens' (Teodoro) ou 'barcos' (Nereu) — muda título e aba inicial
-let shopTab = 'rod';
+let shopStock = null; // { title, stock: { rod: [], line: [], bait: [], boat: [] } } — vem do servidor
+let shopTab = null;
 const SHOP_TABS = [['rod', '🎣 Varas'], ['line', '🧵 Linhas'], ['bait', '🪱 Iscas'], ['boat', '⛵ Barcos']];
 function refreshShop() {
+  if (!shopStock) return;
   const total = profile.inventory.reduce((s, f) => s + f.value, 0);
   $('selldesc').textContent = profile.inventory.length
     ? `${profile.inventory.length} peixes = ${total.toLocaleString('pt-BR')} 🪙` : 'balde vazio';
   $('sellbtn').disabled = !profile.inventory.length;
-  const itens = shopMode === 'itens';
-  $('shoptitle').textContent = itens ? '🐟 Peixe & Cia — Teodoro' : '⚓ Estaleiro do Capitão Nereu';
-  $('shopsellrow').style.display = itens ? 'flex' : 'none';
-  renderTabs($('shoptabs'), SHOP_TABS, shopTab, (k) => { shopTab = k; refreshShop(); });
+  $('shoptitle').textContent = shopStock.title;
+  $('shopsellrow').style.display = 'flex'; // todo vendedor compra peixe
+  const stock = shopStock.stock;
+  const tabs = SHOP_TABS.filter(([k]) => (stock[k] || []).length);
+  if (!tabs.some(([k]) => k === shopTab)) shopTab = tabs.length ? tabs[0][0] : 'rod';
+  renderTabs($('shoptabs'), tabs, shopTab, (k) => { shopTab = k; refreshShop(); });
   const sections = {
     rod: [$('shoprods'), '🎣 Varas', catalog.rods, profile.rod],
     line: [$('shoplines'), '🧵 Linhas', catalog.lines, profile.line],
@@ -676,7 +680,9 @@ function refreshShop() {
     boat: [$('shopboats'), '⛵ Barcos', catalog.boats, profile.boat],
   };
   for (const [k, [el]] of Object.entries(sections)) el.style.display = k === shopTab ? 'block' : 'none';
-  const [box, title, items, eq] = sections[shopTab];
+  const [box, title, allItems, eq] = sections[shopTab];
+  const items = {};
+  for (const id of stock[shopTab] || []) if (allItems[id]) items[id] = allItems[id];
   shopSection(box, title, shopTab, items, eq);
 }
 
@@ -795,7 +801,12 @@ function connect(name) {
       case 'levelup': sfx.level(); toast(`⭐ Nível ${m.level}!`); confetti(); break;
       case 'toast': toast(m.text); break;
       case 'announce': announce(m.text, m.rarity); break;
-      case 'open_shop': shopMode = m.shop || 'itens'; shopTab = shopMode === 'barcos' ? 'boat' : 'rod'; refreshShop(); togglePanel('shop'); break;
+      case 'open_shop':
+        shopStock = { title: m.title, stock: m.stock };
+        shopTab = null; // refreshShop escolhe a primeira aba com estoque
+        refreshShop();
+        togglePanel('shop');
+        break;
       case 'dialog': showDialog(m.npc, m.text); break;
       case 'drop_add': drops.set(m.drop.id, m.drop); break;
       case 'drop_del': drops.delete(m.id); break;
@@ -1704,6 +1715,143 @@ function drawShadow(x, y, rx, ry) {
   ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, 7); ctx.fill();
 }
 
+// construções dos vilarejos das outras ilhas (mesma pegada 5x4 tiles, arquitetura do bioma)
+function drawThemedHouse(d) {
+  const x = d.x, yb = d.y, cx = x + 40;
+  if (d.th === 'snow') { // IGLU
+    drawShadow(cx, yb + 2, 42, 5.5);
+    ctx.fillStyle = '#8a9ab8';
+    ctx.beginPath(); ctx.arc(cx, yb, 38, Math.PI, 0); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#e8f2fc';
+    ctx.beginPath(); ctx.arc(cx, yb, 35, Math.PI, 0); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(140,170,205,.8)'; ctx.lineWidth = 1.2; // blocos de gelo
+    ctx.beginPath();
+    for (let r = 9; r <= 30; r += 7) { ctx.moveTo(cx + r, yb); ctx.arc(cx, yb, r, 0, Math.PI, true); }
+    for (let band = 0; band < 3; band++) {
+      const r0 = 9 + band * 7, r1 = r0 + 7;
+      for (let a = 0.3 + (band % 2) * 0.22; a < Math.PI - 0.25; a += 0.44) {
+        ctx.moveTo(cx - Math.cos(a) * r0, yb - Math.sin(a) * r0);
+        ctx.lineTo(cx - Math.cos(a) * r1, yb - Math.sin(a) * r1);
+      }
+    }
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.55)'; // brilho do sol
+    ctx.beginPath(); ctx.ellipse(cx - 13, yb - 24, 10, 5, -0.5, 0, 7); ctx.fill();
+    ctx.fillStyle = '#8a9ab8'; // túnel de entrada
+    ctx.beginPath(); ctx.arc(cx, yb, 13, Math.PI, 0); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#c8d8ea';
+    ctx.beginPath(); ctx.arc(cx, yb, 11, Math.PI, 0); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#141e2c';
+    ctx.beginPath(); ctx.arc(cx, yb, 7.5, Math.PI, 0); ctx.closePath(); ctx.fill();
+  } else if (d.th === 'desert') { // TENDA DE BAZAR
+    drawShadow(cx, yb + 2, 40, 5);
+    ctx.fillStyle = '#7a3020';
+    ctx.beginPath();
+    ctx.moveTo(cx, yb - 62);
+    ctx.quadraticCurveTo(cx + 34, yb - 44, cx + 38, yb);
+    ctx.lineTo(cx - 38, yb);
+    ctx.quadraticCurveTo(cx - 34, yb - 44, cx, yb - 62);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#eedfb8';
+    ctx.beginPath();
+    ctx.moveTo(cx, yb - 59.5);
+    ctx.quadraticCurveTo(cx + 31.6, yb - 42, cx + 35.6, yb - 1.6);
+    ctx.lineTo(cx - 35.6, yb - 1.6);
+    ctx.quadraticCurveTo(cx - 31.6, yb - 42, cx, yb - 59.5);
+    ctx.closePath(); ctx.fill();
+    ctx.save(); ctx.clip();
+    ctx.fillStyle = '#c8503a'; // listras
+    for (let i = -3; i <= 3; i += 2) ctx.fillRect(cx + i * 10 - 4, yb - 60, 8, 60);
+    ctx.fillStyle = 'rgba(120,50,30,.25)'; ctx.fillRect(cx + 14, yb - 60, 24, 60); // sombra lateral
+    ctx.fillStyle = 'rgba(255,250,230,.3)'; ctx.fillRect(cx - 34, yb - 60, 9, 60); // luz
+    ctx.restore();
+    ctx.fillStyle = '#3a1c10'; // abertura
+    ctx.beginPath(); ctx.moveTo(cx - 9, yb); ctx.lineTo(cx, yb - 26); ctx.lineTo(cx + 9, yb); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#eedfb8'; // cortina recolhida
+    ctx.beginPath(); ctx.moveTo(cx + 3, yb - 18); ctx.quadraticCurveTo(cx + 12, yb - 10, cx + 9, yb); ctx.lineTo(cx + 16, yb); ctx.quadraticCurveTo(cx + 12, yb - 14, cx + 5, yb - 22); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#5a3a1a'; ctx.fillRect(cx - 1, yb - 71, 2, 10); // mastro
+    ctx.fillStyle = '#ffd24a';
+    ctx.beginPath(); ctx.moveTo(cx + 1, yb - 71); ctx.lineTo(cx + 12, yb - 68); ctx.lineTo(cx + 1, yb - 65); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#b04030'; ctx.fillRect(cx - 9, yb, 18, 4); // tapete
+    ctx.fillStyle = '#ffd24a'; ctx.fillRect(cx - 6, yb + 1.4, 3, 1.2); ctx.fillRect(cx + 3, yb + 1.4, 3, 1.2);
+  } else if (d.th === 'savanna') { // PALHOÇA REDONDA
+    drawShadow(cx, yb + 2, 38, 5);
+    ctx.fillStyle = '#4a2c12'; ctx.fillRect(cx - 28, yb - 27, 56, 27); // contorno da parede
+    ctx.fillStyle = '#b87c46'; ctx.fillRect(cx - 26, yb - 25, 52, 25);
+    ctx.fillStyle = '#96602f'; ctx.fillRect(cx + 12, yb - 25, 14, 25); // sombra
+    ctx.fillStyle = '#cd9258'; ctx.fillRect(cx - 26, yb - 25, 8, 25);  // luz
+    ctx.strokeStyle = 'rgba(90,50,20,.4)'; ctx.lineWidth = 1; // emendas do barro
+    ctx.beginPath();
+    ctx.moveTo(cx - 26, yb - 17); ctx.lineTo(cx + 26, yb - 17);
+    ctx.moveTo(cx - 26, yb - 9); ctx.lineTo(cx + 26, yb - 9);
+    ctx.stroke();
+    ctx.fillStyle = '#4a2c12'; // telhado cônico de palha
+    ctx.beginPath(); ctx.moveTo(cx, yb - 74); ctx.lineTo(cx + 42, yb - 21); ctx.lineTo(cx - 42, yb - 21); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#d8b054';
+    ctx.beginPath(); ctx.moveTo(cx, yb - 71); ctx.lineTo(cx + 38, yb - 23.5); ctx.lineTo(cx - 38, yb - 23.5); ctx.closePath(); ctx.fill();
+    ctx.save(); ctx.clip();
+    ctx.fillStyle = '#eecf7a'; // face iluminada
+    ctx.beginPath(); ctx.moveTo(cx, yb - 71); ctx.lineTo(cx - 14, yb - 23); ctx.lineTo(cx - 38, yb - 23); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#a87c2e'; ctx.lineWidth = 1.2; // camadas de palha
+    ctx.beginPath();
+    for (let i = 1; i <= 3; i++) {
+      const yy = yb - 71 + i * 12.5, sp = 10 + i * 9;
+      ctx.moveTo(cx - sp, yy); ctx.quadraticCurveTo(cx, yy + 3.5, cx + sp, yy);
+    }
+    for (let i = -3; i <= 3; i++) { ctx.moveTo(cx + i * 5, yb - 30); ctx.lineTo(cx + i * 6.5, yb - 24); }
+    ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = '#6a4a1a'; ctx.fillRect(cx - 2, yb - 79, 4, 7); // topete do pico
+    ctx.fillStyle = '#3a2210'; // porta
+    ctx.beginPath(); ctx.arc(cx, yb - 12, 8, Math.PI, 0); ctx.fill();
+    ctx.fillRect(cx - 8, yb - 12, 16, 12);
+    ctx.fillStyle = '#241608';
+    ctx.beginPath(); ctx.arc(cx, yb - 12, 6, Math.PI, 0); ctx.fill();
+    ctx.fillRect(cx - 6, yb - 12, 12, 12);
+    ctx.fillStyle = '#8a5a28'; ctx.fillRect(cx - 9, yb - 13, 2, 13); ctx.fillRect(cx + 7, yb - 13, 2, 13); // batentes
+  } else { // volcano: CASA DE PEDRA / FORJA
+    const W2 = 80;
+    drawShadow(cx, yb + 2, 44, 5);
+    ctx.fillStyle = '#171019'; ctx.fillRect(x, yb - 32, W2, 32);
+    ctx.fillStyle = '#3f3644'; ctx.fillRect(x + 2, yb - 30, W2 - 4, 30);
+    ctx.fillStyle = '#4d4454'; ctx.fillRect(x + 2, yb - 30, 9, 30);
+    ctx.fillStyle = '#332b38'; ctx.fillRect(x + W2 - 13, yb - 30, 11, 30);
+    ctx.strokeStyle = 'rgba(15,10,18,.6)'; ctx.lineWidth = 1; // blocos de basalto
+    ctx.beginPath();
+    for (let i = 1; i < 4; i++) { ctx.moveTo(x + 2, yb - 30 + i * 7.5); ctx.lineTo(x + W2 - 2, yb - 30 + i * 7.5); }
+    for (let i = 0; i < 5; i++) { const ox = x + 10 + i * 15; ctx.moveTo(ox, yb - 30); ctx.lineTo(ox, yb - 22.5); ctx.moveTo(ox + 7, yb - 22.5); ctx.lineTo(ox + 7, yb - 15); ctx.moveTo(ox, yb - 15); ctx.lineTo(ox, yb - 7.5); ctx.moveTo(ox + 7, yb - 7.5); ctx.lineTo(ox + 7, yb); }
+    ctx.stroke();
+    ctx.fillStyle = '#171019'; // telhado de lajes
+    ctx.beginPath(); ctx.moveTo(x - 7, yb - 30); ctx.lineTo(x + 16, yb - 52); ctx.lineTo(x + 64, yb - 52); ctx.lineTo(x + 87, yb - 30); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#524a56';
+    ctx.beginPath(); ctx.moveTo(x - 3, yb - 31.6); ctx.lineTo(x + 17.4, yb - 50); ctx.lineTo(x + 62.6, yb - 50); ctx.lineTo(x + 83, yb - 31.6); ctx.closePath(); ctx.fill();
+    ctx.save(); ctx.clip();
+    ctx.fillStyle = '#5f5764'; ctx.fillRect(x - 4, yb - 50, 90, 6); // fileiras de laje
+    ctx.fillStyle = '#463e4b'; ctx.fillRect(x - 4, yb - 38, 90, 7);
+    ctx.restore();
+    ctx.fillStyle = '#171019'; ctx.fillRect(x + 58, yb - 68, 13, 20); // chaminé
+    ctx.fillStyle = '#3f3644'; ctx.fillRect(x + 59.5, yb - 66, 10, 18);
+    ctx.fillStyle = '#1a1420'; ctx.fillRect(x + 60.5, yb - 66, 8, 3.5);
+    ctx.fillStyle = '#ff7030'; ctx.fillRect(x + 62, yb - 65.4, 5, 2); // brasa na boca
+    ctx.fillStyle = '#171019'; // porta de metal em arco
+    ctx.beginPath(); ctx.arc(cx, yb - 15, 9, Math.PI, 0); ctx.fill();
+    ctx.fillRect(cx - 9, yb - 15, 18, 15);
+    ctx.fillStyle = '#241d24';
+    ctx.beginPath(); ctx.arc(cx, yb - 15, 7, Math.PI, 0); ctx.fill();
+    ctx.fillRect(cx - 7, yb - 15, 14, 15);
+    ctx.fillStyle = '#6a626e'; // rebites
+    for (const [rx, ry] of [[-5, -18], [5, -18], [-5, -6], [5, -6]]) ctx.fillRect(cx + rx - 0.8, yb + ry, 1.6, 1.6);
+    // janelas com brasa acesa
+    for (const wx of [x + 14, x + W2 - 22]) {
+      ctx.fillStyle = '#171019'; ctx.fillRect(wx - 1.5, yb - 24.5, 11, 9);
+      ctx.fillStyle = '#2a1414'; ctx.fillRect(wx, yb - 23, 8, 6);
+      ctx.fillStyle = '#ff8c3a'; ctx.fillRect(wx + 1, yb - 22, 6, 4);
+      ctx.fillStyle = '#ffd08a'; ctx.fillRect(wx + 2, yb - 21.4, 2.4, 1.6);
+      ctx.fillStyle = '#171019'; ctx.fillRect(wx + 3.4, yb - 23, 1.2, 6);
+    }
+  }
+}
+
 function drawDecor(d, time) {
   const sway = Math.sin(time * 0.9 + d.x * 0.05) * 0.8;
   switch (d.type) {
@@ -1891,6 +2039,7 @@ function drawDecor(d, time) {
       break;
     }
     case 'house': {
+      if (d.th && d.th !== 'grass') { drawThemedHouse(d); break; }
       // casa estilo Alundra: telhado projetado com beiral, empena e sombreamento 3D
       const x = d.x, yb = d.y;             // x = borda esquerda, yb = base da parede
       const W2 = 80;                        // 5 tiles de largura
@@ -2608,14 +2757,17 @@ function drawChar(x, y, dir, name, moving, time, boat, fishing, npcColor, hue) {
 
 // visual do equipamento por tier — todos os jogadores veem ("ostentação")
 const RODVIS = {
-  bambu:   { len: 12, c: '#8a6434', hi: '#a8834c', reel: '#6a4a24' },
-  fibra:   { len: 15, c: '#5a6a7a', hi: '#8a9aac', reel: '#3a4a5a' },
-  carbono: { len: 18, c: '#23282f', hi: '#4aa0ff', reel: '#4aa0ff' },
-  dourada: { len: 20, c: '#d8a020', hi: '#ffe080', reel: '#fff0a0', sparkle: true },
+  bambu:     { len: 12, c: '#8a6434', hi: '#a8834c', reel: '#6a4a24' },
+  junco:     { len: 13, c: '#9aa04a', hi: '#c6cc74', reel: '#6a7030' },
+  fibra:     { len: 15, c: '#5a6a7a', hi: '#8a9aac', reel: '#3a4a5a' },
+  carbono:   { len: 18, c: '#23282f', hi: '#4aa0ff', reel: '#4aa0ff' },
+  obsidiana: { len: 19, c: '#2a2233', hi: '#a06aff', reel: '#c0a0ff', sparkle: true },
+  dourada:   { len: 20, c: '#d8a020', hi: '#ffe080', reel: '#fff0a0', sparkle: true },
 };
 const LINEVIS = {
   nylon:    { c: 'rgba(255,255,255,.6)', bob: ['#e04040', '#fff'] },
   trancada: { c: 'rgba(140,240,170,.8)', bob: ['#30b050', '#eaffea'] },
+  encerada: { c: 'rgba(250,225,150,.85)', bob: ['#d8a020', '#fff0c0'] },
   aco:      { c: 'rgba(190,220,255,.95)', bob: ['#ffd24a', '#fff8d0'] },
 };
 
@@ -2801,14 +2953,18 @@ function spawnAmbient(dt, camX, camY, time) {
     else if (zone === 'vulcao') { if (!isWaterPx(x, y)) amb.push({ kind: 'ember', x, y, vx: (Math.random() - 0.5) * 6, vy: -10 - Math.random() * 8, life: 1.6, max: 1.6 }); }
     else if (zone === 'vila' || zone === 'savana') { if (!isWaterPx(x, y)) amb.push({ kind: 'petal', x, y: camY - 5, vx: 8 + Math.random() * 8, vy: 10 + Math.random() * 8, life: 5, max: 5 }); }
   }
-  // fumaça das chaminés das casas
+  // fumaça das chaminés (posição varia com a arquitetura de cada bioma)
   for (const d of DECOR) {
-    if (d.type !== 'house' || d.v <= 0.4) continue;
+    if (d.type !== 'house') continue;
+    const off = d.th === 'volcano' ? [64, -70]                      // chaminé da forja (sempre acesa)
+      : d.th === 'snow' ? (d.v > 0.5 ? [40, -40] : null)            // respiro do iglu
+      : (!d.th || d.th === 'grass') && d.v > 0.4 ? [62, -68] : null; // chaminé da casa da vila
+    if (!off) continue;
     if (d.x < camX - 90 || d.x > camX + VW + 90 || d.y < camY - 30 || d.y > camY + VH + 100) continue;
     d.smokeT -= dt;
     if (d.smokeT <= 0) {
       d.smokeT = 0.5 + Math.random() * 0.4;
-      amb.push({ kind: 'smoke', x: d.x + 62 + (Math.random() * 2 - 1), y: d.y - 68,
+      amb.push({ kind: 'smoke', x: d.x + off[0] + (Math.random() * 2 - 1), y: d.y + off[1],
         vx: 2 + Math.random() * 3, vy: -7 - Math.random() * 3, life: 2.4, max: 2.4 });
     }
   }

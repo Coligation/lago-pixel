@@ -116,15 +116,18 @@ const FISH = [
 const FISH_BY_ID = Object.fromEntries(FISH.map(f => [f.id, f]));
 
 const RODS = {
-  bambu:   { name: 'Vara de Bambu',    price: 0,     level: 1,  luck: 0, bar: 80 },
-  fibra:   { name: 'Vara de Fibra',    price: 400,   level: 3,  luck: 1, bar: 100 },
-  carbono: { name: 'Vara de Carbono',  price: 2000,  level: 7,  luck: 2, bar: 115 },
-  dourada: { name: 'Vara Dourada',     price: 10000, level: 12, luck: 3, bar: 135 },
-  guardia: { name: 'Vara do Guardião', price: 99999, level: 1,  luck: 5, bar: 155, secret: true }, // única, só na quest final
+  bambu:     { name: 'Vara de Bambu',     price: 0,     level: 1,  luck: 0, bar: 80 },
+  junco:     { name: 'Vara de Junco',     price: 250,   level: 2,  luck: 1, bar: 88 },  // bazar do deserto: barata, honesta
+  fibra:     { name: 'Vara de Fibra',     price: 400,   level: 3,  luck: 1, bar: 100 },
+  carbono:   { name: 'Vara de Carbono',   price: 2000,  level: 7,  luck: 2, bar: 115 },
+  obsidiana: { name: 'Vara de Obsidiana', price: 5500,  level: 10, luck: 3, bar: 120 }, // forja do vulcão: sorte alta, barra média
+  dourada:   { name: 'Vara Dourada',      price: 10000, level: 12, luck: 3, bar: 135 },
+  guardia:   { name: 'Vara do Guardião',  price: 99999, level: 1,  luck: 5, bar: 155, secret: true }, // única, só na quest final
 };
 const LINES = {
   nylon:    { name: 'Linha de Nylon',    price: 0,    level: 1, drain: 1.0 },
   trancada: { name: 'Linha Trançada',    price: 600,  level: 4, drain: 0.75 },
+  encerada: { name: 'Linha Encerada',    price: 1400, level: 6, drain: 0.65 }, // empório da geleira
   aco:      { name: 'Linha de Aço',      price: 3000, level: 9, drain: 0.55 },
 };
 const BOATS = {
@@ -133,8 +136,21 @@ const BOATS = {
   veleiro: { name: 'Caravela',     price: 18000, level: 14, speed: 2.6, seats: 3 },
 };
 const BAITS = {
-  minhoca:   { name: 'Minhoca',        price: 25,  pack: 10, biteFactor: 0.5, luckBonus: 0 },
-  brilhante: { name: 'Isca Brilhante', price: 120, pack: 10, biteFactor: 0.7, luckBonus: 1 },
+  minhoca:   { name: 'Minhoca',         price: 25,  pack: 10, biteFactor: 0.5,  luckBonus: 0 },
+  cupim:     { name: 'Cupim Dourado',   price: 60,  pack: 12, biteFactor: 0.35, luckBonus: 0 }, // savana: mordida relâmpago
+  krill:     { name: 'Krill Congelado', price: 90,  pack: 8,  biteFactor: 0.6,  luckBonus: 1 }, // geleira
+  brilhante: { name: 'Isca Brilhante',  price: 120, pack: 10, biteFactor: 0.7,  luckBonus: 1 },
+  larva:     { name: 'Larva de Magma',  price: 300, pack: 6,  biteFactor: 0.8,  luckBonus: 2 }, // vulcão: premium
+};
+
+// estoque de cada vendedor — cada ilha tem seus achados
+const SHOPS = {
+  ze:     { title: '🐟 Peixe & Cia — Teodoro',     rods: ['bambu', 'fibra', 'carbono', 'dourada'], lines: ['nylon', 'trancada', 'aco'], baits: ['minhoca', 'brilhante'], boats: [] },
+  nino:   { title: '⚓ Estaleiro do Capitão Nereu', rods: [], lines: [], baits: [], boats: ['remo', 'lancha', 'veleiro'] },
+  iluq:   { title: '🧊 Empório Gelado do Iluq',     rods: [], lines: ['encerada'], baits: ['krill', 'minhoca'], boats: [] },
+  rashid: { title: '🏜️ Bazar do Rashid',           rods: ['junco'], lines: ['nylon', 'trancada'], baits: ['minhoca', 'brilhante'], boats: [] },
+  ayo:    { title: '🌾 Palhoça do Ayo',             rods: ['junco', 'fibra'], lines: [], baits: ['cupim', 'minhoca'], boats: [] },
+  magda:  { title: '🌋 Forja da Magda',             rods: ['obsidiana'], lines: ['aco'], baits: ['larva'], boats: [] },
 };
 
 const ZONE_WEIGHTS = {
@@ -838,8 +854,14 @@ wss.on('connection', (ws) => {
         if (!npc) break;
         const npcPos = WORLD.npcPosAt(NPC_SPOTS[npc.id], npc, Date.now());
         if (Math.hypot(npcPos.x - player.x, npcPos.y - player.y) > 6 * WORLD.TILE) break;
-        if (npc.role === 'shop') { send(ws, 'open_shop', { shop: 'itens' }); break; }
-        if (npc.role === 'boatshop') { send(ws, 'open_shop', { shop: 'barcos' }); break; }
+        if (npc.role === 'shop' || npc.role === 'boatshop') {
+          const s = SHOPS[npc.id];
+          if (!s) break;
+          player.shopId = npc.id;
+          send(ws, 'open_shop', { shopId: npc.id, title: s.title,
+            stock: { rod: s.rods, line: s.lines, bait: s.baits, boat: s.boats } });
+          break;
+        }
         const chain = QUESTS[npc.id];
         const { st, q, prog, done } = questProgress(pr, npc.id);
         if (!q) { send(ws, 'dialog', { npc: npc.name, text: 'Você já me ajudou com tudo. O arquipélago agradece, lenda!' }); break; }
@@ -923,6 +945,10 @@ wss.on('connection', (ws) => {
         const cat = CATS[msg.kind];
         const item = cat && cat[msg.id];
         if (!item) break;
+        // só compra o que a loja aberta realmente vende
+        const shop = SHOPS[player.shopId];
+        const stockKey = { rod: 'rods', line: 'lines', bait: 'baits', boat: 'boats' }[msg.kind];
+        if (!shop || !shop[stockKey].includes(msg.id)) break;
         if (msg.kind !== 'bait') {
           const cur = { rod: pr.rod, line: pr.line, boat: pr.boat }[msg.kind];
           if (cur === msg.id) break;
