@@ -40,6 +40,14 @@
   #toast { bottom: 17%; left: 50%; transform: translateX(-50%); font-size: 16px; font-weight: 600;
     text-align: center; padding: 12px 24px; display: none; position: absolute; border-width: 2px; z-index: 8; }
 
+  #tutorial { top: 76px; left: 50%; transform: translateX(-50%); max-width: 72%; display: none;
+    position: absolute; z-index: 7; border: 2px solid #7affc8; font-size: 13.5px; text-align: center;
+    padding: 9px 34px 9px 16px; animation: tutpulse 2s infinite; }
+  #tutorial .step { color: #7affc8; font-weight: 700; margin-right: 6px; }
+  #tutorial .tutskip { position: absolute; top: 2px; right: 8px; color: #9ab; cursor: pointer; font-size: 13px; padding: 2px 4px; }
+  @keyframes tutpulse { 0%, 100% { border-color: #7affc8; } 50% { border-color: #2a6a52; } }
+  body.touch #tutorial { font-size: 12.5px; max-width: 86%; top: 60px; }
+
   #minimap { position: absolute; top: 10px; right: 10px; border: 1px solid #3a5a7a; border-radius: 8px;
     image-rendering: pixelated; opacity: .92; width: 160px; }
 
@@ -191,6 +199,7 @@
   <div id="zonelabel" class="panel"></div>
   <div id="announces"></div>
   <div id="toast" class="panel"></div>
+  <div id="tutorial" class="panel"><span class="tutskip">✕</span><span id="tut-text"></span></div>
 
   <div id="chatbox" class="panel">
     <div id="chatlog"></div>
@@ -337,7 +346,7 @@
     </div>
   </div>
 </div>
-<script src="world.js?v=12"></script>
-<script src="game.js?v=12"></script>
+<script src="world.js?v=13"></script>
+<script src="game.js?v=13"></script>
 </body>
 </html>

@@ -465,6 +465,74 @@ $('key-reset').onclick = () => {
   toast(TR('⌨️ Teclas padrão restauradas!'), 1600);
 };
 renderKeylist();
+
+// ---------------------------------------------------------------- tutorial de primeira pescaria
+// só aparece pra quem nunca pescou; cada passo avança quando a pessoa FAZ a ação
+let tutStep = -1;
+let tutTimer = 0;
+function tutTexts() {
+  const k = keyLabel(KB.fish), e = keyLabel(KB.interact), q = keyLabel(KB.quests);
+  if (LANG === 'en') {
+    return IS_TOUCH ? [
+      '🚶 Drag your finger on the left half of the screen to WALK',
+      '🌊 Walk to the water\'s edge, face it and tap the 🎣 button to cast your line',
+      '👀 Wait... when the ❗ pops up above you, tap 🎣 AGAIN to hook it!',
+      '💪 HOLD the 🎣 button to keep the fish inside the bar until it fills up',
+      '💰 Fish in the bucket! Find Teodoro in the village (🐟 stall) and tap USE to sell',
+      '📜 Last tip: talk to Beatriz to get quests. Tight lines! 🎣',
+    ] : [
+      '🚶 Use WASD or the arrow keys to WALK',
+      `🌊 Walk to the water's edge, face it and press ${k} to cast your line`,
+      `👀 Wait... when the ❗ pops up above you, press ${k} AGAIN to hook it!`,
+      `💪 HOLD ${k} to keep the fish inside the bar until it fills up`,
+      `💰 Fish in the bucket! Find Teodoro in the village (🐟 stall) and press ${e} to sell`,
+      `📜 Last tip: talk to Beatriz to get quests (${q} opens the journal). Tight lines! 🎣`,
+    ];
+  }
+  return IS_TOUCH ? [
+    '🚶 Arraste o dedo na metade esquerda da tela pra ANDAR',
+    '🌊 Vá até a beira da água, olhe pra ela e toque no botão 🎣 pra lançar a linha',
+    '👀 Espere... quando o ❗ aparecer em cima de você, toque no 🎣 DE NOVO pra fisgar!',
+    '💪 SEGURE o botão 🎣 pra manter o peixe dentro da barra até ela encher',
+    '💰 Peixe no balde! Ache o Teodoro na vila (barraquinha 🐟) e toque em USAR pra vender',
+    '📜 Última dica: fale com a Beatriz pra pegar missões. Boa pesca! 🎣',
+  ] : [
+    '🚶 Use WASD ou as setas pra ANDAR',
+    `🌊 Vá até a beira da água, olhe pra ela e aperte ${k} pra lançar a linha`,
+    `👀 Espere... quando o ❗ aparecer em cima de você, aperte ${k} DE NOVO pra fisgar!`,
+    `💪 SEGURE ${k} pra manter o peixe dentro da barra até ela encher`,
+    `💰 Peixe no balde! Ache o Teodoro na vila (barraquinha 🐟) e aperte ${e} pra vender`,
+    `📜 Última dica: fale com a Beatriz pra pegar missões (${q} abre o diário). Boa pesca! 🎣`,
+  ];
+}
+function tutShow(n) {
+  tutStep = n;
+  tutTimer = 0;
+  const el = $('tutorial');
+  if (n < 0) { el.style.display = 'none'; return; }
+  const steps = tutTexts();
+  if (n >= steps.length) { tutDone(); return; }
+  $('tut-text').innerHTML = `<span class="step">${Math.min(n + 1, 5)}/5</span>${steps[n]}`;
+  el.style.display = 'block';
+}
+function tutDone() {
+  tutStep = -1;
+  $('tutorial').style.display = 'none';
+  localStorage.setItem('lp_tut', '1');
+}
+{
+  const skip = document.querySelector('#tutorial .tutskip');
+  skip.addEventListener('click', tutDone);
+  skip.addEventListener('touchstart', (e) => { e.preventDefault(); tutDone(); }, { passive: false });
+}
+function updateTutorial(dt) {
+  if (tutStep < 0) return;
+  if (tutStep === 0 && me.moving) { tutTimer += dt; if (tutTimer > 0.8) tutShow(1); }
+  else if (tutStep === 1 && fish.phase !== 'idle') tutShow(2);
+  else if (tutStep === 2 && reel) tutShow(3);
+  else if (tutStep === 5) { tutTimer += dt; if (tutTimer > 12) tutDone(); }
+  // passo 3 avança na captura; passo 4 avança quando abre a loja
+}
 // paleta de cores da roupa (fica salva no perfil do servidor)
 {
   const row = $('colorrow');
@@ -995,6 +1063,9 @@ function connect(payload) {
         document.querySelector('#hud .name').textContent = '🎣 ' + me.name;
         $('login').style.display = 'none';
         refreshHUD();
+        // primeira pescaria? mostra o tutorial guiado (não incomoda veteranos)
+        if (!localStorage.getItem('lp_tut') && !profile.totalCaught) tutShow(0);
+        else tutStep = -1;
         break;
       case 'time': timeOffset = m.timeOffset; break;
       case 'event': luckEvent = m.active; break;
@@ -1043,6 +1114,7 @@ function connect(payload) {
         catchCard = { fish: m.fish, t: performance.now() };
         sfx.catch(); splash(fish.bobX, fish.bobY, 14);
         refreshHUD();
+        if (tutStep === 3) tutShow(4); // ✅ primeiro peixe: manda achar o Teodoro
         break;
       case 'escaped': fish.phase = 'idle'; reel = null; toast(m.reason); sfx.fail(); break;
       case 'sold': profile = m.you; refreshHUD(); sfx.coin(); toast(LANG === 'en' ? `Sold everything for ${m.total.toLocaleString('pt-BR')} coins!` : `Vendeu tudo por ${m.total.toLocaleString('pt-BR')} moedas!`); break;
@@ -1055,6 +1127,7 @@ function connect(payload) {
         shopTab = null; // refreshShop escolhe a primeira aba com estoque
         refreshShop();
         togglePanel('shop');
+        if (tutStep === 4) tutShow(5); // ✅ achou o vendedor: última dica sobre missões
         break;
       case 'dialog': showDialog(m.npc, m.text); break;
       case 'drop_add': drops.set(m.drop.id, m.drop); break;
@@ -3556,6 +3629,7 @@ function frame_(now) {
     if (!chatOpen) pollGamepad();
     updateMe(dt);
     if (reel) updateReel(dt);
+    updateTutorial(dt);
     for (const p of others.values()) {
       if (p.riding) { // carona: gruda no barco do dono e olha pra frente dele
         const o = p.riding === me.id ? me : others.get(p.riding);
