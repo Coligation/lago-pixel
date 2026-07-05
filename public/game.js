@@ -3525,11 +3525,33 @@ function loop(now) {
     requestAnimationFrame(loop);
   }
 }
+// no celular: joystick e botões só existem DENTRO do jogo — nunca sobre login/menus
+// (a zona de toque do analógico cobria metade da tela e engolia os toques nos campos)
+function updateTouchUiGate() {
+  const loginOpen = $('login').style.display !== 'none';
+  const modalOpen = ['inventory', 'shop', 'dex', 'quests', 'settings'].some((id) => $(id).style.display === 'block')
+    || $('terms').style.display === 'block';
+  const tu = $('touchui');
+  const wantTu = loginOpen ? 'none' : 'block';
+  if (tu.style.display !== wantTu) tu.style.display = wantTu;
+  const jz = $('joyzone');
+  const wantJz = (loginOpen || modalOpen) ? 'none' : 'block';
+  if (jz.style.display !== wantJz) {
+    jz.style.display = wantJz;
+    if (wantJz === 'none') { // solta o analógico se estava no meio de um arrasto
+      joy.active = false; joy.vx = 0; joy.vy = 0;
+      $('joybase').style.display = 'none';
+      $('joyknob').style.display = 'none';
+    }
+  }
+}
+
 function frame_(now) {
   const dt = Math.min(0.05, (now - lastT) / 1000);
   lastT = now;
   const time = now / 1000;
 
+  if (IS_TOUCH) updateTouchUiGate();
   if (profile) {
     if (!chatOpen) pollGamepad();
     updateMe(dt);
