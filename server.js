@@ -155,6 +155,17 @@ const SHOPS = {
   magda:  { title: '🌋 Forja da Magda',             rods: ['obsidiana'], lines: ['aco'], baits: ['larva'], boats: [] },
 };
 
+// onde cada item é vendido (pro aviso "disponível na loja" dizer a loja certa)
+const SHOP_PLACE = {};
+for (const [npcId, s] of Object.entries(SHOPS)) {
+  const npc = WORLD.NPCS.find((n) => n.id === npcId);
+  const isl = WORLD.ISLANDS.find((i) => i.id === npc.island);
+  const place = `${npc.name} (${isl.name})`;
+  for (const [kind, key] of [['rod', 'rods'], ['line', 'lines'], ['bait', 'baits'], ['boat', 'boats']]) {
+    for (const id of s[key]) if (!SHOP_PLACE[kind + ':' + id]) SHOP_PLACE[kind + ':' + id] = place;
+  }
+}
+
 const ZONE_WEIGHTS = {
   vila:    { lixo: 14, comum: 55, incomum: 20, raro: 8,  epico: 2.5, lendario: 0.5, mitico: 0.06, abissal: 0.015 },
   deserto: { lixo: 10, comum: 48, incomum: 25, raro: 12, epico: 4,   lendario: 1,   mitico: 0.09, abissal: 0.02 },
@@ -720,8 +731,32 @@ function clearFishing(p) {
   p.fishing = null; p.bobX = null; p.bobY = null;
 }
 
+// heartbeat: aba fechada/rede caída não manda 'close' — o ping detecta e derruba,
+// e aí o 'close' roda normalmente registrando a sessão
+setInterval(() => {
+  for (const c of wss.clients) {
+    if (c.isAlive === false) { c.terminate(); continue; }
+    c.isAlive = false;
+    c.ping();
+  }
+}, 30000);
+
+// checkpoint: sessão em andamento vai sendo gravada — nem reinício do servidor perde
+setInterval(() => {
+  const now = Date.now();
+  for (const p of players.values()) {
+    p.profile.playMin = +((p.profile.playMin || 0) + (now - p.lastTick) / 60000).toFixed(1);
+    p.lastTick = now;
+    p.profile.lastSeen = now;
+    if (p.sessEntry) p.sessEntry.out = now;
+  }
+  if (players.size) saveDirty = true;
+}, 60000);
+
 wss.on('connection', (ws) => {
   let player = null;
+  ws.isAlive = true;
+  ws.on('pong', () => { ws.isAlive = true; });
 
   ws.on('message', (raw) => {
     let msg;
@@ -765,7 +800,15 @@ wss.on('connection', (ws) => {
       player = { ws, id: nextId++, name, x: WORLD.SPAWN.x, y: WORLD.SPAWN.y, dir: 'down',
         moving: false, boat: false, profile: getProfile(name), fishing: null,
         bobX: null, bobY: null, lastChat: 0, gm: false, sessionStart: Date.now() };
-      if (!player.profile.firstSeen) player.profile.firstSeen = player.sessionStart;
+      { // abre a sessão já na entrada (saída vai sendo atualizada pelo checkpoint)
+        const prf2 = player.profile, t0 = player.sessionStart;
+        if (!prf2.firstSeen) prf2.firstSeen = t0;
+        prf2.lastSeen = t0;
+        prf2.sessions = (prf2.sessions || 0) + 1;
+        player.sessEntry = { in: t0, out: t0 };
+        player.lastTick = t0;
+        prf2.hist = [...(prf2.hist || []), player.sessEntry].slice(-20);
+      }
       players.set(ws, player);
       saveDirty = true;
 
@@ -776,7 +819,7 @@ wss.on('connection', (ws) => {
         drops: [...drops.values()],
         timeOffset, dayLen: DAY_LEN, event: luckEvent, zones: zonesView(),
         catalog: { rods: RODS, lines: LINES, boats: BOATS, baits: BAITS, rarities: RARITIES,
-          fish: FISH, quests: QUESTS,
+          where: SHOP_PLACE, fish: FISH, quests: QUESTS,
           achievements: ACHIEVEMENTS.map(({ id, name, desc, reward }) => ({ id, name, desc, reward })) },
       });
       broadcast('player_join', { player: publicState(player) }, ws);
@@ -1178,12 +1221,9 @@ wss.on('connection', (ws) => {
   ws.on('close', () => {
     if (player) {
       const prf = player.profile, now = Date.now();
-      if (player.sessionStart) { // registra a sessão (entrada → saída)
-        prf.lastSeen = now;
-        prf.sessions = (prf.sessions || 0) + 1;
-        prf.playMin = +((prf.playMin || 0) + (now - player.sessionStart) / 60000).toFixed(1);
-        prf.hist = [...(prf.hist || []), { in: player.sessionStart, out: now }].slice(-20);
-      }
+      prf.lastSeen = now; // fecha a sessão (o grosso já foi gravado pelos checkpoints)
+      prf.playMin = +((prf.playMin || 0) + (now - player.lastTick) / 60000).toFixed(1);
+      if (player.sessEntry) player.sessEntry.out = now;
       dropRiders(player); // se era dono de barco com passageiros
       clearFishing(player);
       players.delete(ws);

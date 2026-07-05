@@ -794,17 +794,20 @@ function refreshMoneyGoal() {
     boat: top(profile.boats, catalog.boats, profile.boat ? catalog.boats[profile.boat].price : -1) };
   let best = null;
   for (const [kind, items] of [['rod', catalog.rods], ['line', catalog.lines], ['boat', catalog.boats]]) {
-    for (const item of Object.values(items)) {
+    for (const [id, item] of Object.entries(items)) {
+      if (item.secret) continue; // itens de missão não são meta de loja
+      if (!(catalog.where && catalog.where[kind + ':' + id])) continue; // ninguém vende? não sugere
       if (item.price <= owned[kind]) continue;
-      if (!best || item.price < best.price) best = { ...item, kind };
+      if (!best || item.price < best.price) best = { ...item, id, kind };
     }
   }
   const el = $('money-goal');
   if (!best) { el.textContent = '👑 Você tem o melhor de tudo!'; return; }
   const falta = best.price - profile.coins;
+  const place = catalog.where[best.kind + ':' + best.id];
   el.textContent = falta > 0
     ? `Faltam ${falta.toLocaleString('pt-BR')} 🪙 → ${best.name}`
-    : `💡 ${best.name} disponível na loja!`;
+    : `💡 ${best.name} à venda: ${place}`;
 }
 
 $('sellbtn').onclick = () => send({ type: 'sell_all' });
