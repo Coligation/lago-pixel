@@ -74,6 +74,16 @@
     max-height: 84%; overflow-y: auto; display: none; z-index: 5; }
   .modal h2 { font-size: 16px; margin-bottom: 8px; color: #9fd6ff; }
   .modal h3 { font-size: 13.5px; margin: 10px 0 4px; color: #9fd6ff; }
+  .xclose { float: right; cursor: pointer; color: #9ab; font-size: 17px; line-height: 1;
+    padding: 4px 8px; margin: -2px -8px 0 6px; border-radius: 6px; }
+  .xclose:hover { color: #fff; background: rgba(255,255,255,.08); }
+  body.touch .xclose { font-size: 22px; padding: 8px 14px; }
+
+  .tabs { display: flex; gap: 4px; margin: 2px 0 8px; flex-wrap: wrap; }
+  .tab { background: #16283a; border: 1px solid #3a5a7a; color: #9fc5e8; padding: 5px 12px;
+    border-radius: 7px; cursor: pointer; font-size: 12.5px; }
+  .tab.sel { background: #1d5a8a; border-color: #4a8ac0; color: #fff; }
+  body.touch .tab { padding: 8px 14px; }
 
   .fishrow { display: flex; justify-content: space-between; align-items: center; padding: 4px 6px;
     border-radius: 6px; font-size: 12.5px; gap: 6px; }
@@ -176,17 +186,24 @@
   </div>
 
   <div id="inventory" class="panel modal">
-    <h2>🪣 Seu Balde</h2>
-    <div id="invlist"></div>
-    <div style="margin-top:8px; font-size:12.5px;">Total: <b class="coins" id="invtotal">0 🪙</b> — venda com o Zé na vila. "Soltar" deixa o peixe no chão pra um amigo pegar!</div>
+    <div class="xclose">✕</div>
+    <h2 id="invtitle">🪣 Seu Balde</h2>
+    <div class="tabs" id="invtabs"></div>
+    <div id="invtab-bucket">
+      <div id="invlist"></div>
+      <div style="margin-top:8px; font-size:12.5px;">Total: <b class="coins" id="invtotal">0 🪙</b> — venda com o Zé na vila. "Soltar" deixa o peixe no chão pra um amigo pegar!</div>
+    </div>
+    <div id="invtab-gear" style="display:none"></div>
   </div>
 
   <div id="dex" class="panel modal">
+    <div class="xclose">✕</div>
     <h2>📖 Coleção de Peixes <span id="dexcount" style="font-size:12px;color:#9ab"></span></h2>
     <div id="dexlist"></div>
   </div>
 
   <div id="quests" class="panel modal">
+    <div class="xclose">✕</div>
     <h2>📜 Missões</h2>
     <div id="questlist"></div>
     <div style="margin-top:8px;font-size:11.5px;color:#9ab">Fale com os moradores das ilhas (tecla E) pra aceitar e entregar missões.</div>
@@ -195,7 +212,9 @@
   </div>
 
   <div id="shop" class="panel modal">
+    <div class="xclose">✕</div>
     <h2 id="shoptitle">🏪 Barraca do Zé do Peixe</h2>
+    <div class="tabs" id="shoptabs"></div>
     <div class="shopitem" id="shopsellrow">
       <div>Vender todos os peixes <div class="desc" id="selldesc">balde vazio</div></div>
       <button class="btn" id="sellbtn">Vender</button>
@@ -215,6 +234,7 @@
   <div class="tbtn mini" id="btn-settings" style="display:flex">⚙️</div>
 
   <div id="settings" class="panel modal">
+    <div class="xclose">✕</div>
     <h2>⚙️ Configurações</h2>
     <div style="font-size:12.5px;margin:4px 0">👕 Cor da roupa:</div>
     <div id="colorrow"></div>
@@ -252,7 +272,7 @@
     </div>
   </div>
 </div>
-<script src="world.js?v=3"></script>
-<script src="game.js?v=3"></script>
+<script src="world.js?v=4"></script>
+<script src="game.js?v=4"></script>
 </body>
 </html>

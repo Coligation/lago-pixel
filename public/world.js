@@ -10,7 +10,7 @@
   const T = {
     DEEP: 0, SHALLOW: 1, SAND: 2, GRASS: 3, TALL: 4, TREE: 5, PALM: 6, CACTUS: 7,
     SAV: 8, ACACIA: 9, SNOW: 10, ICE: 11, ROCK: 12, VOLC: 13, LAVA: 14, PATH: 15,
-    PLANK: 16, WALL: 17, FLOWER: 18, DOOR: 19, SAVTALL: 20, ROOF: 21, STONE: 22, FAROLBASE: 23, KIOSK: 24,
+    PLANK: 16, WALL: 17, FLOWER: 18, DOOR: 19, SAVTALL: 20, ROOF: 21, STONE: 22, FAROLBASE: 23, KIOSK: 24, CAVE: 25,
   };
 
   const WALK_OK = new Set([T.SAND, T.GRASS, T.TALL, T.SAV, T.SNOW, T.ICE, T.PATH, T.PLANK, T.FLOWER, T.SAVTALL, T.VOLC, T.STONE]);
@@ -28,6 +28,7 @@
   const ZONE_NAMES = {
     vila: 'Vila do Cais', gelo: 'Geleira Branca', deserto: 'Duna Seca',
     savana: 'Costa Dourada', vulcao: 'Ilha do Vulcão', farol: 'Ilha do Farol', altomar: 'Alto-Mar',
+    tesouro: 'Grutas Secretas',
   };
 
   const NPCS = [
@@ -52,6 +53,16 @@
   // sala secreta dentro do farol (canto NO do mapa, só via teleporte)
   const INTERIOR = { x0: 8, y0: 8, x1: 18, y1: 16, doorTx: 13, doorTy: 16, spawnTx: 13, spawnTy: 14 };
   const FAROL_DOOR = { tx: 400, ty: 301 }; // frente da torre
+
+  // grutas secretas: entrada escondida na ilha → sala no canto do mapa com tesouros
+  const CAVES = [
+    { id: 'gvila',    name: 'Gruta da Mata',    entrance: { tx: 183, ty: 272 }, room: { x0: 30, y0: 8, x1: 42, y1: 17, doorTx: 36, doorTy: 17, spawnTx: 36, spawnTy: 15 } },
+    { id: 'gdeserto', name: 'Caverna das Dunas', entrance: { tx: 604, ty: 103 }, room: { x0: 50, y0: 8, x1: 62, y1: 17, doorTx: 56, doorTy: 17, spawnTx: 56, spawnTy: 15 } },
+    { id: 'gvulcao',  name: 'Toca de Magma',    entrance: { tx: 388, ty: 505 }, room: { x0: 70, y0: 8, x1: 82, y1: 17, doorTx: 76, doorTy: 17, spawnTx: 76, spawnTy: 15 } },
+  ];
+
+  // assentos dos passageiros nos barcos (deslocamento em px a partir do dono)
+  const SEAT_OFF = [[-11, 3], [11, 3], [0, 8]];
 
   function h2(x, y) {
     let n = (x * 374761393 + y * 668265263) | 0;
@@ -187,6 +198,25 @@
     }
     set(INTERIOR.doorTx, INTERIOR.doorTy, T.DOOR);
 
+    // 5d) grutas secretas: salas + entradas nas ilhas
+    const GROUNDOF = (tx, ty) => ({ grass: T.GRASS, snow: T.SNOW, desert: T.SAND, savanna: T.SAV, volcano: T.VOLC, rockisle: T.STONE })[nearestIsland(tx, ty).isl.theme];
+    for (const c of CAVES) {
+      const R = c.room;
+      for (let y = R.y0; y <= R.y1; y++) for (let x = R.x0; x <= R.x1; x++) {
+        const border = x === R.x0 || x === R.x1 || y === R.y0 || y === R.y1;
+        set(x, y, border ? T.WALL : T.STONE);
+      }
+      set(R.doorTx, R.doorTy, T.DOOR);
+      // boca da caverna com clareira ao redor
+      const E = c.entrance;
+      const ground = GROUNDOF(E.tx, E.ty);
+      for (let y = -1; y <= 1; y++) for (let x = -1; x <= 1; x++) {
+        const t = at(E.tx + x, E.ty + y);
+        if (t !== T.SHALLOW && t !== T.DEEP) set(E.tx + x, E.ty + y, ground);
+      }
+      set(E.tx, E.ty, T.CAVE);
+    }
+
     // 6) clareira ao redor dos NPCs
     const GROUND = { grass: T.GRASS, snow: T.SNOW, desert: T.SAND, savanna: T.SAV, volcano: T.VOLC, rockisle: T.STONE };
     for (const n of NPCS) {
@@ -244,5 +274,5 @@
     return { x, y, moving: k < 1 && (x1 !== x0 || y1 !== y0), dir };
   }
 
-  return { W, H, TILE, T, WALK_OK, BOAT_OK, ISLANDS, NPCS, SPAWN, ZONE_NAMES, INTERIOR, FAROL_DOOR, genWorld, zoneAt, nearestIsland, h2, npcWalkables, npcPosAt };
+  return { W, H, TILE, T, WALK_OK, BOAT_OK, ISLANDS, NPCS, SPAWN, ZONE_NAMES, INTERIOR, FAROL_DOOR, CAVES, SEAT_OFF, genWorld, zoneAt, nearestIsland, h2, npcWalkables, npcPosAt };
 });

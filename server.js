@@ -91,6 +91,12 @@ const FISH = [
   { id: 'megalodonte', name: 'Megalodonte-Jovem',    rarity: 'abissal',  base: 20000, wmin: 200.0, wmax: 900.0, zones: ['altomar', 'farol'] },
   { id: 'horror',     name: 'Horror Abissal',        rarity: 'abissal',  base: 24000, wmin: 50.0,  wmax: 400.0, zones: ['altomar', 'gelo', 'vulcao'] },
   { id: 'primordial', name: 'Peixe-Primordial',      rarity: 'abissal',  base: 30000, wmin: 20.0,  wmax: 150.0, zones: ['vila', 'deserto', 'savana', 'farol'] },
+  // tesouros das grutas secretas (não são pescáveis — só coletados nas cavernas)
+  { id: 'moedaantiga', name: 'Moeda Antiga',      rarity: 'raro',     base: 160,  wmin: 0.1, wmax: 0.3, zones: ['tesouro'] },
+  { id: 'perola',      name: 'Pérola do Abismo',  rarity: 'raro',     base: 240,  wmin: 0.1, wmax: 0.5, zones: ['tesouro'] },
+  { id: 'cristal',     name: 'Cristal Marinho',   rarity: 'epico',    base: 650,  wmin: 0.5, wmax: 2.0, zones: ['tesouro'] },
+  { id: 'ambar',       name: 'Âmbar Milenar',     rarity: 'epico',    base: 520,  wmin: 0.3, wmax: 1.5, zones: ['tesouro'] },
+  { id: 'reliquia',    name: 'Relíquia Perdida',  rarity: 'lendario', base: 1600, wmin: 0.5, wmax: 3.0, zones: ['tesouro'] },
   // exclusivos dos círculos de evento no mar
   { id: 'sardadourada', name: 'Sardinha-Dourada',     rarity: 'raro',     base: 180,   wmin: 0.2,  wmax: 1.0,   zones: ['ev:dourado'] },
   { id: 'olhoabismo',   name: 'Olho-do-Abismo',       rarity: 'epico',    base: 550,   wmin: 5.0,  wmax: 40.0,  zones: ['ev:sombrio'] },
@@ -122,9 +128,9 @@ const LINES = {
   aco:      { name: 'Linha de Aço',      price: 3000, level: 9, drain: 0.55 },
 };
 const BOATS = {
-  remo:   { name: 'Barco a Remo', price: 800,   level: 3,  speed: 1.0 },
-  lancha: { name: 'Lancha',       price: 5000,  level: 8,  speed: 1.9 },
-  veleiro: { name: 'Veleiro',     price: 18000, level: 14, speed: 2.6 },
+  remo:    { name: 'Barco a Remo', price: 800,   level: 3,  speed: 1.0, seats: 1 },
+  lancha:  { name: 'Lancha',       price: 5000,  level: 8,  speed: 1.9, seats: 2 },
+  veleiro: { name: 'Caravela',     price: 18000, level: 14, speed: 2.6, seats: 3 },
 };
 const BAITS = {
   minhoca:   { name: 'Minhoca',        price: 25,  pack: 10, biteFactor: 0.5, luckBonus: 0 },
@@ -404,6 +410,10 @@ function getProfile(name) {
     rod: RODS[p.rod] ? p.rod : 'bambu',
     line: LINES[p.line] ? p.line : 'nylon',
     boat: BOATS[p.boat] ? p.boat : null,
+    // posse de equipamento (pra poder alternar o que está equipado)
+    rods: [...new Set(['bambu', ...(Array.isArray(p.rods) ? p.rods : []), RODS[p.rod] ? p.rod : 'bambu'])].filter(r => RODS[r]),
+    lines: [...new Set(['nylon', ...(Array.isArray(p.lines) ? p.lines : []), LINES[p.line] ? p.line : 'nylon'])].filter(l => LINES[l]),
+    boats: [...new Set([...(Array.isArray(p.boats) ? p.boats : []), ...(BOATS[p.boat] ? [p.boat] : [])])].filter(b => BOATS[b]),
     baits: { minhoca: 0, brilhante: 0, ...(p.baits || {}) },
     activeBait: p.activeBait || null,
     inventory: (p.inventory || []).filter(f => FISH_BY_ID[f.fishId]),
@@ -492,6 +502,35 @@ setInterval(() => { // expira drops antigos
   }
 }, 30000);
 
+// tesouros brotando nas grutas secretas
+const TREASURE_TABLE = [['moedaantiga', 40], ['perola', 30], ['cristal', 14], ['ambar', 11], ['reliquia', 5]];
+function rollTreasure() {
+  let roll = Math.random() * 100;
+  for (const [id, w] of TREASURE_TABLE) { roll -= w; if (roll <= 0) return FISH_BY_ID[id]; }
+  return FISH_BY_ID.moedaantiga;
+}
+setInterval(() => {
+  const TL = WORLD.TILE;
+  for (const c of WORLD.CAVES) {
+    const R = c.room;
+    const inRoom = [...drops.values()].filter(d =>
+      d.x > R.x0 * TL && d.x < R.x1 * TL && d.y > R.y0 * TL && d.y < R.y1 * TL);
+    if (inRoom.length >= 3 || Math.random() > 0.55) continue;
+    const spec = rollTreasure();
+    const weight = +(spec.wmin + Math.random() * (spec.wmax - spec.wmin)).toFixed(2);
+    const value = Math.round(spec.base * (0.8 + Math.random() * 0.5));
+    const drop = {
+      id: nextDropId++,
+      fish: { fishId: spec.id, name: spec.name, rarity: spec.rarity, weight, value, zone: 'tesouro' },
+      x: (R.x0 + 2 + Math.random() * (R.x1 - R.x0 - 4)) * TL,
+      y: (R.y0 + 2 + Math.random() * (R.y1 - R.y0 - 4)) * TL,
+      by: '✨', t: Date.now(),
+    };
+    drops.set(drop.id, drop);
+    broadcast('drop_add', { drop });
+  }
+}, 45000);
+
 function send(ws, type, data = {}) { if (ws.readyState === 1) ws.send(JSON.stringify({ type, ...data })); }
 function broadcast(type, data = {}, exceptWs = null) {
   const msg = JSON.stringify({ type, ...data });
@@ -502,13 +541,46 @@ function publicState(p) {
   return { id: p.id, name: p.name, x: Math.round(p.x), y: Math.round(p.y), dir: p.dir,
     moving: p.moving, boat: p.boat, level: p.profile.level,
     rodT: p.profile.rod, lineT: p.profile.line, boatT: p.profile.boat, hue: p.profile.color, // equipamento e cor visíveis
+    riding: p.riding || null, seat: p.seat || 0,
     fishing: p.fishing ? p.fishing.phase : null, bobX: p.bobX, bobY: p.bobY };
+}
+
+// ---------------------------------------------------------------- carona no barco
+
+const ridersOf = (owner) => [...players.values()].filter(q => q.riding === owner.id);
+
+function findLandNear(x, y) {
+  for (let r = 1; r <= 6; r++) {
+    for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+      const px = x + dx * r * WORLD.TILE, py = y + dy * r * WORLD.TILE;
+      if (WORLD.WALK_OK.has(tileAt(px, py))) return { x: px, y: py };
+    }
+  }
+  return { x: WORLD.SPAWN.x, y: WORLD.SPAWN.y };
+}
+
+function dismount(p, nearX, nearY) {
+  if (!p.riding) return;
+  p.riding = null; p.seat = 0;
+  const spot = findLandNear(nearX !== undefined ? nearX : p.x, nearY !== undefined ? nearY : p.y);
+  p.x = spot.x; p.y = spot.y;
+  clearFishing(p);
+  send(p.ws, 'ride_end', { x: p.x, y: p.y });
+  broadcast('player_state', { player: publicState(p) }, p.ws);
+}
+
+function dropRiders(owner) {
+  for (const r of ridersOf(owner)) {
+    dismount(r);
+    send(r.ws, 'toast', { text: '⚓ O dono do barco atracou.' });
+  }
 }
 
 function profileView(p) {
   const pr = p.profile;
   return { coins: pr.coins, xp: pr.xp, level: pr.level, xpNext: xpForLevel(pr.level),
     rod: pr.rod, line: pr.line, boat: pr.boat, baits: pr.baits, activeBait: pr.activeBait,
+    rods: pr.rods, lines: pr.lines, boats: pr.boats,
     inventory: pr.inventory, dex: pr.dex, quests: pr.quests, achv: pr.achv, color: pr.color,
     totalCaught: pr.totalCaught, bestCatch: pr.bestCatch };
 }
@@ -598,12 +670,74 @@ wss.on('connection', (ws) => {
 
     switch (msg.type) {
       case 'move': {
+        if (player.riding) break; // passageiro vai onde o barco vai
+        const wasBoat = player.boat;
         player.x = Math.max(8, Math.min(WORLD.W * WORLD.TILE - 8, Number(msg.x) || player.x));
         player.y = Math.max(8, Math.min(WORLD.H * WORLD.TILE - 8, Number(msg.y) || player.y));
         player.dir = ['up', 'down', 'left', 'right'].includes(msg.dir) ? msg.dir : player.dir;
         player.moving = !!msg.moving;
         player.boat = !!msg.boat && !!pr.boat;
         if (player.fishing && msg.moving) clearFishing(player);
+        broadcast('player_state', { player: publicState(player) }, ws);
+        if (wasBoat && !player.boat) dropRiders(player); // atracou → todo mundo desce
+        else if (player.boat) { // passageiros acompanham
+          for (const r of ridersOf(player)) {
+            const off = WORLD.SEAT_OFF[r.seat] || [0, 6];
+            r.x = player.x + off[0]; r.y = player.y + off[1];
+          }
+        }
+        break;
+      }
+
+      case 'board': {
+        if (player.riding) { // quer descer
+          const owner = [...players.values()].find(q => q.id === player.riding);
+          dismount(player, owner ? owner.x : player.x, owner ? owner.y : player.y);
+          break;
+        }
+        if (player.boat) break; // já está no próprio barco
+        // procura um barco de outro jogador por perto com lugar livre
+        let best = null, bd = 52;
+        for (const q of players.values()) {
+          if (q === player || !q.boat || !q.profile.boat) continue;
+          const d = Math.hypot(q.x - player.x, q.y - player.y);
+          if (d < bd) { bd = d; best = q; }
+        }
+        if (!best) { send(ws, 'toast', { text: 'Nenhum barco com lugar por perto.' }); break; }
+        const seats = BOATS[best.profile.boat].seats;
+        const taken = ridersOf(best).map(r => r.seat);
+        if (taken.length >= seats) { send(ws, 'toast', { text: `O ${BOATS[best.profile.boat].name} de ${best.name} está lotado!` }); break; }
+        let seat = 0;
+        while (taken.includes(seat)) seat++;
+        player.riding = best.id; player.seat = seat;
+        clearFishing(player);
+        const off = WORLD.SEAT_OFF[seat] || [0, 6];
+        player.x = best.x + off[0]; player.y = best.y + off[1];
+        send(ws, 'ride', { owner: best.id, seat });
+        send(best.ws, 'toast', { text: `⛵ ${player.name} embarcou com você!` });
+        broadcast('player_state', { player: publicState(player) }, ws);
+        break;
+      }
+
+      case 'enter_cave': {
+        if (player.riding) break;
+        const TL = WORLD.TILE;
+        let dest = null;
+        for (const c of WORLD.CAVES) {
+          const R = c.room;
+          const inside = player.x > R.x0 * TL && player.x < R.x1 * TL && player.y > R.y0 * TL && player.y < R.y1 * TL;
+          if (inside) { dest = { x: c.entrance.tx * TL + 8, y: (c.entrance.ty + 1) * TL + 8 }; break; }
+          const E = c.entrance;
+          if (Math.hypot(E.tx * TL + 8 - player.x, E.ty * TL + 8 - player.y) < 3 * TL) {
+            dest = { x: R.spawnTx * TL + 8, y: R.spawnTy * TL + 8 };
+            break;
+          }
+        }
+        if (!dest) break;
+        player.x = dest.x; player.y = dest.y;
+        clearFishing(player);
+        player.boat = false;
+        send(ws, 'teleport', { x: player.x, y: player.y });
         broadcast('player_state', { player: publicState(player) }, ws);
         break;
       }
@@ -713,13 +847,15 @@ wss.on('connection', (ws) => {
           pr.coins += q.reward.coins;
           gainXp(player, q.reward.xp);
           let extra = '';
-          if (q.reward.rod && RODS[q.reward.rod] && RODS[q.reward.rod].luck > RODS[pr.rod].luck) {
-            pr.rod = q.reward.rod;
+          if (q.reward.rod && RODS[q.reward.rod] && !pr.rods.includes(q.reward.rod)) {
+            pr.rods.push(q.reward.rod);
+            if (RODS[q.reward.rod].luck > RODS[pr.rod].luck) pr.rod = q.reward.rod;
             extra += `\n🎣 Você recebeu: ${RODS[q.reward.rod].name}!`;
             if (q.reward.rod === 'guardia') broadcast('announce', { text: `👑 ${player.name} conquistou a VARA DO GUARDIÃO!`, rarity: 'abissal' });
-          } else if (q.reward.rod) extra += '\n(Você já tem uma vara melhor — leve moedas extras!) ';
-          if (q.reward.line && LINES[q.reward.line] && LINES[q.reward.line].drain < LINES[pr.line].drain) {
-            pr.line = q.reward.line;
+          } else if (q.reward.rod) extra += '\n(Vara repetida — leve as moedas!) ';
+          if (q.reward.line && LINES[q.reward.line] && !pr.lines.includes(q.reward.line)) {
+            pr.lines.push(q.reward.line);
+            if (LINES[q.reward.line].drain < LINES[pr.line].drain) pr.line = q.reward.line;
             extra += `\n🧵 Você recebeu: ${LINES[q.reward.line].name}!`;
           }
           if (q.reward.bait) {
@@ -760,6 +896,11 @@ wss.on('connection', (ws) => {
         if (pr.inventory.length >= INVENTORY_CAP) { send(ws, 'toast', { text: 'Balde cheio!' }); break; }
         drops.delete(d.id);
         pr.inventory.push(d.fish);
+        if (d.fish.zone === 'tesouro') { // tesouro conta pra coleção (peixe de amigo não)
+          const dx = pr.dex[d.fish.fishId] || (pr.dex[d.fish.fishId] = { n: 0, best: 0 });
+          dx.n++; if (d.fish.weight > dx.best) dx.best = d.fish.weight;
+          checkAchievements(player);
+        }
         saveDirty = true;
         broadcast('drop_del', { id: d.id });
         send(ws, 'toast', { text: `Pegou ${d.fish.name} (${d.fish.weight} kg) de ${d.by}!` });
@@ -788,13 +929,29 @@ wss.on('connection', (ws) => {
           if (pr.level < item.level) { send(ws, 'toast', { text: `Requer nível ${item.level}.` }); break; }
         }
         if (pr.coins < item.price) { send(ws, 'toast', { text: 'Moedas insuficientes!' }); break; }
+        // já tem? não deixa comprar duas vezes
+        if ((msg.kind === 'rod' && pr.rods.includes(msg.id)) || (msg.kind === 'line' && pr.lines.includes(msg.id))
+          || (msg.kind === 'boat' && pr.boats.includes(msg.id))) break;
         pr.coins -= item.price;
-        if (msg.kind === 'rod') pr.rod = msg.id;
-        else if (msg.kind === 'line') pr.line = msg.id;
-        else if (msg.kind === 'boat') pr.boat = msg.id;
+        if (msg.kind === 'rod') { pr.rods.push(msg.id); pr.rod = msg.id; }
+        else if (msg.kind === 'line') { pr.lines.push(msg.id); pr.line = msg.id; }
+        else if (msg.kind === 'boat') { pr.boats.push(msg.id); pr.boat = msg.id; }
         else pr.baits[msg.id] = (pr.baits[msg.id] || 0) + item.pack;
         saveDirty = true;
         send(ws, 'bought', { you: profileView(player) });
+        broadcast('player_state', { player: publicState(player) }, ws);
+        break;
+      }
+
+      case 'equip': { // troca o equipamento ativo (precisa possuir)
+        const { kind, id } = msg;
+        if (kind === 'rod' && pr.rods.includes(id)) pr.rod = id;
+        else if (kind === 'line' && pr.lines.includes(id)) pr.line = id;
+        else if (kind === 'boat' && pr.boats.includes(id)) pr.boat = id;
+        else break;
+        saveDirty = true;
+        send(ws, 'bought', { you: profileView(player) });
+        broadcast('player_state', { player: publicState(player) }, ws);
         break;
       }
 
@@ -888,6 +1045,7 @@ wss.on('connection', (ws) => {
 
   ws.on('close', () => {
     if (player) {
+      dropRiders(player); // se era dono de barco com passageiros
       clearFishing(player);
       players.delete(ws);
       saveDirty = true;

@@ -38,6 +38,11 @@ for (let ty = 0; ty < H; ty++) for (let tx = 0; tx < W; tx++) {
     DECOR.push({ type: 'bush', x: tx * TILE + 8, y: ty * TILE + 14, v: h2(tx, ty), th: t === T.TALL ? 'grass' : 'savanna' });
   }
   if (t === T.FAROLBASE) RENDER_MAP[ty * W + tx] = T.STONE;
+  if (t === T.CAVE) {
+    const theme = WORLD.nearestIsland(tx, ty).isl.theme;
+    RENDER_MAP[ty * W + tx] = THEME_GROUND[theme];
+    DECOR.push({ type: 'cave', x: tx * TILE + 8, y: (ty + 1) * TILE, v: h2(tx, ty), th: theme });
+  }
   if (t === T.KIOSK) {
     RENDER_MAP[ty * W + tx] = T.PATH;
     // canto superior esquerdo do quiosque vira a decoração inteira
@@ -252,6 +257,13 @@ function closeModals() {
   $('dialog').style.display = 'none';
 }
 
+// X de fechar em todos os painéis (essencial no celular)
+for (const el of document.querySelectorAll('.xclose')) {
+  const close = (e) => { e.preventDefault(); e.stopPropagation(); el.closest('.modal').style.display = 'none'; };
+  el.addEventListener('click', close);
+  el.addEventListener('touchstart', close, { passive: false });
+}
+
 // ---------------------------------------------------------------- configurações
 
 $('btn-settings').addEventListener('click', () => togglePanel('settings'));
@@ -336,7 +348,25 @@ function tickMoney(dt) {
   $('money-val').textContent = Math.round(shownCoins).toLocaleString('pt-BR');
 }
 
+function renderTabs(box, tabs, sel, onPick) {
+  box.innerHTML = '';
+  for (const [key, label] of tabs) {
+    const b = document.createElement('button');
+    b.className = 'tab' + (sel === key ? ' sel' : '');
+    b.textContent = label;
+    b.onclick = () => onPick(key);
+    box.appendChild(b);
+  }
+}
+
+let invTab = 'bucket';
 function refreshInventory() {
+  renderTabs($('invtabs'), [['bucket', '🪣 Balde'], ['gear', '🎒 Equipamento']], invTab,
+    (k) => { invTab = k; refreshInventory(); });
+  $('invtitle').textContent = invTab === 'bucket' ? '🪣 Seu Balde' : '🎒 Seu Equipamento';
+  $('invtab-bucket').style.display = invTab === 'bucket' ? 'block' : 'none';
+  $('invtab-gear').style.display = invTab === 'gear' ? 'block' : 'none';
+  if (invTab === 'gear') { refreshGear(); return; }
   const list = $('invlist');
   list.innerHTML = '';
   let total = 0;
@@ -358,6 +388,51 @@ function refreshInventory() {
   });
   if (!profile.inventory.length) list.innerHTML = '<div class="fishrow">Balde vazio... vá pescar!</div>';
   $('invtotal').textContent = total.toLocaleString('pt-BR') + ' 🪙';
+}
+
+// aba Equipamento: troca vara/linha/barco de qualquer lugar (só o que você possui)
+function refreshGear() {
+  const box = $('invtab-gear');
+  box.innerHTML = '';
+  const groups = [
+    ['🎣 Varas', 'rod', catalog.rods, profile.rods, profile.rod],
+    ['🧵 Linhas', 'line', catalog.lines, profile.lines, profile.line],
+    ['⛵ Barcos', 'boat', catalog.boats, profile.boats, profile.boat],
+  ];
+  const descs = {
+    rod: (i) => `sorte +${i.luck}`,
+    line: (i) => `peixe escapa ${Math.round((1 - i.drain) * 100)}% menos`,
+    boat: (i) => `velocidade ${i.speed}x · ${i.seats} carona${i.seats > 1 ? 's' : ''}`,
+  };
+  for (const [title, kind, items, ownedIds, eqId] of groups) {
+    const h = document.createElement('h3');
+    h.textContent = title;
+    box.appendChild(h);
+    const ids = (ownedIds || []).filter(id => items[id]);
+    if (!ids.length) {
+      const el = document.createElement('div');
+      el.className = 'fishrow';
+      el.textContent = kind === 'boat' ? 'Nenhum barco — compre no Mestre Nino!' : '—';
+      box.appendChild(el);
+      continue;
+    }
+    for (const id of ids) {
+      const item = items[id];
+      const el = document.createElement('div');
+      el.className = 'shopitem';
+      el.innerHTML = `<div>${item.name} <div class="desc">${descs[kind](item)}</div></div>`;
+      if (eqId === id) {
+        el.innerHTML += '<span class="owned">em uso ✓</span>';
+      } else {
+        const btn = document.createElement('button');
+        btn.className = 'btn';
+        btn.textContent = 'usar';
+        btn.onclick = () => send({ type: 'equip', kind, id });
+        el.appendChild(btn);
+      }
+      box.appendChild(el);
+    }
+  }
 }
 
 // cada espécie tem silhueta/padrão próprios (derivados do id), cor pela raridade
@@ -423,7 +498,7 @@ const miniFish = (color, caught, id = 'x') => fishIcon(id, color, caught);
 function refreshDex() {
   const list = $('dexlist');
   list.innerHTML = '';
-  const zoneOrder = ['vila', 'altomar', 'deserto', 'savana', 'gelo', 'vulcao', '*'];
+  const zoneOrder = ['vila', 'altomar', 'deserto', 'savana', 'gelo', 'vulcao', 'tesouro', '*'];
   for (const z of zoneOrder) {
     const pool = catalog.fish.filter(f => z === '*' ? f.zones[0] === '*' : (f.zones[0] !== '*' && f.zones.includes(z)));
     if (!pool.length) continue;
@@ -494,12 +569,19 @@ function shopSection(box, title, kind, items, ownedId) {
     const descs = {
       rod: `sorte +${item.luck} · barra maior · nível ${item.level}+`,
       line: `peixe escapa ${Math.round((1 - item.drain) * 100)}% menos · nível ${item.level}+`,
-      boat: `velocidade ${item.speed}x · explore as ilhas · nível ${item.level}+`,
+      boat: `velocidade ${item.speed}x · ${item.seats} carona${item.seats > 1 ? 's' : ''} · nível ${item.level}+`,
       bait: item.luckBonus ? 'atrai peixes raros' : 'mordidas mais rápidas',
     };
     el.innerHTML = `<div>${item.name}${kind === 'bait' ? ` ×${item.pack}` : ''} <div class="desc">${descs[kind]}${kind === 'bait' ? ` · você tem ${profile.baits[id] || 0}` : ''}</div></div>`;
+    const ownedIds = { rod: profile.rods, line: profile.lines, boat: profile.boats }[kind] || [];
     if (kind !== 'bait' && ownedId === id) {
-      el.innerHTML += '<span class="owned">seu ✓</span>';
+      el.innerHTML += '<span class="owned">equipado ✓</span>';
+    } else if (kind !== 'bait' && ownedIds.includes(id)) {
+      const btn = document.createElement('button');
+      btn.className = 'btn';
+      btn.textContent = 'equipar';
+      btn.onclick = () => send({ type: 'equip', kind, id });
+      el.appendChild(btn);
     } else {
       const btn = document.createElement('button');
       btn.className = 'btn';
@@ -513,7 +595,9 @@ function shopSection(box, title, kind, items, ownedId) {
   }
 }
 
-let shopMode = 'itens'; // 'itens' (Zé) ou 'barcos' (Nino)
+let shopMode = 'itens'; // 'itens' (Zé) ou 'barcos' (Nino) — muda título e aba inicial
+let shopTab = 'rod';
+const SHOP_TABS = [['rod', '🎣 Varas'], ['line', '🧵 Linhas'], ['bait', '🪱 Iscas'], ['boat', '⛵ Barcos']];
 function refreshShop() {
   const total = profile.inventory.reduce((s, f) => s + f.value, 0);
   $('selldesc').textContent = profile.inventory.length
@@ -522,15 +606,16 @@ function refreshShop() {
   const itens = shopMode === 'itens';
   $('shoptitle').textContent = itens ? '🐟 Peixe & Cia — Zé do Peixe' : '⛵ Barcos do Nino';
   $('shopsellrow').style.display = itens ? 'flex' : 'none';
-  $('shoprods').style.display = $('shoplines').style.display = $('shopbaits').style.display = itens ? 'block' : 'none';
-  $('shopboats').style.display = itens ? 'none' : 'block';
-  if (itens) {
-    shopSection($('shoprods'), '🎣 Varas', 'rod', catalog.rods, profile.rod);
-    shopSection($('shoplines'), '🧵 Linhas', 'line', catalog.lines, profile.line);
-    shopSection($('shopbaits'), '🪱 Iscas', 'bait', catalog.baits, null);
-  } else {
-    shopSection($('shopboats'), '⛵ Barcos', 'boat', catalog.boats, profile.boat);
-  }
+  renderTabs($('shoptabs'), SHOP_TABS, shopTab, (k) => { shopTab = k; refreshShop(); });
+  const sections = {
+    rod: [$('shoprods'), '🎣 Varas', catalog.rods, profile.rod],
+    line: [$('shoplines'), '🧵 Linhas', catalog.lines, profile.line],
+    bait: [$('shopbaits'), '🪱 Iscas', catalog.baits, null],
+    boat: [$('shopboats'), '⛵ Barcos', catalog.boats, profile.boat],
+  };
+  for (const [k, [el]] of Object.entries(sections)) el.style.display = k === shopTab ? 'block' : 'none';
+  const [box, title, items, eq] = sections[shopTab];
+  shopSection(box, title, shopTab, items, eq);
 }
 
 function refreshAchievements() {
@@ -549,8 +634,10 @@ function refreshAchievements() {
 
 // meta de dinheiro: próximo equipamento a comprar
 function refreshMoneyGoal() {
-  const owned = { rod: catalog.rods[profile.rod].price, line: catalog.lines[profile.line].price,
-    boat: profile.boat ? catalog.boats[profile.boat].price : -1 };
+  const top = (ids, items, fb) => Math.max(fb, ...(ids || []).map(i => items[i] ? items[i].price : fb));
+  const owned = { rod: top(profile.rods, catalog.rods, catalog.rods[profile.rod].price),
+    line: top(profile.lines, catalog.lines, catalog.lines[profile.line].price),
+    boat: top(profile.boats, catalog.boats, profile.boat ? catalog.boats[profile.boat].price : -1) };
   let best = null;
   for (const [kind, items] of [['rod', catalog.rods], ['line', catalog.lines], ['boat', catalog.boats]]) {
     for (const item of Object.values(items)) {
@@ -599,6 +686,18 @@ function connect(name) {
         fish.phase = 'idle';
         sfx.boat();
         break;
+      case 'ride':
+        me.riding = m.owner; me.seat = m.seat;
+        fish.phase = 'idle';
+        sfx.boat();
+        toast('⛵ Você embarcou! Pesque à vontade — aperte E perto da terra pra descer.', 3200);
+        break;
+      case 'ride_end':
+        me.riding = null;
+        if (m.x) { me.x = m.x; me.y = m.y; }
+        fish.phase = 'idle';
+        sfx.boat();
+        break;
       case 'player_join': others.set(m.player.id, { ...m.player, tx: m.player.x, ty: m.player.y }); break;
       case 'player_leave': others.delete(m.id); break;
       case 'player_state': {
@@ -634,7 +733,7 @@ function connect(name) {
       case 'levelup': sfx.level(); toast(`⭐ Nível ${m.level}!`); confetti(); break;
       case 'toast': toast(m.text); break;
       case 'announce': announce(m.text, m.rarity); break;
-      case 'open_shop': shopMode = m.shop || 'itens'; refreshShop(); togglePanel('shop'); break;
+      case 'open_shop': shopMode = m.shop || 'itens'; shopTab = shopMode === 'barcos' ? 'boat' : 'rod'; refreshShop(); togglePanel('shop'); break;
       case 'dialog': showDialog(m.npc, m.text); break;
       case 'drop_add': drops.set(m.drop.id, m.drop); break;
       case 'drop_del': drops.delete(m.id); break;
@@ -697,6 +796,7 @@ function tryCast() {
 
 function interact() {
   if ($('dialog').style.display === 'block') { $('dialog').style.display = 'none'; return; }
+  if (me.riding) { send({ type: 'board' }); return; } // desce do barco de carona
 
   let nearest = null, nd = 40;
   for (const d of drops.values()) {
@@ -720,6 +820,27 @@ function interact() {
     const inside = me.x > IN.x0 * TILE && me.x < IN.x1 * TILE && me.y > IN.y0 * TILE && me.y < IN.y1 * TILE;
     const nearExit = inside && Math.hypot(IN.doorTx * TILE + 8 - me.x, IN.doorTy * TILE - me.y) < 34;
     if (nearFarolDoor || nearExit) { send({ type: 'enter_farol' }); return; }
+  }
+
+  // grutas secretas: entrar pela boca da caverna / sair pela porta
+  for (const c of WORLD.CAVES) {
+    const E = c.entrance, R = c.room;
+    const nearMouth = Math.hypot(E.tx * TILE + 8 - me.x, E.ty * TILE + 8 - me.y) < 34;
+    const inside = me.x > R.x0 * TILE && me.x < R.x1 * TILE && me.y > R.y0 * TILE && me.y < R.y1 * TILE;
+    const nearExit = inside && Math.hypot(R.doorTx * TILE + 8 - me.x, R.doorTy * TILE - me.y) < 34;
+    if (nearMouth || nearExit) { send({ type: 'enter_cave' }); return; }
+  }
+
+  // pegar carona em barco de outro jogador por perto
+  // (se você tem barco próprio e está de frente pra água, o seu tem prioridade)
+  {
+    let boatNear = false;
+    for (const p of others.values()) {
+      if (p.boat && Math.hypot(p.x - me.x, p.y - me.y) < 48) { boatNear = true; break; }
+    }
+    const [fdx, fdy] = DIRV[me.dir];
+    const ownFirst = profile.boat && isWaterPx(me.x + fdx * TILE, me.y + fdy * TILE);
+    if (boatNear && !me.boat && !ownFirst) { send({ type: 'board' }); return; }
   }
 
   // porta de casa? bate... tá trancada
@@ -920,6 +1041,17 @@ function sendMove(force) {
 }
 
 function updateMe(dt) {
+  if (me.riding) { // passageiro: gruda no barco do dono
+    me.moving = false;
+    const o = others.get(me.riding);
+    if (o) {
+      const off = WORLD.SEAT_OFF[me.seat] || [0, 6];
+      me.x = o.x + off[0]; me.y = o.y + off[1];
+    }
+    const z0 = WORLD.zoneAt(Math.floor(me.x / TILE), Math.floor(me.y / TILE));
+    if (z0 !== currentZone) { currentZone = z0; $('zonelabel').textContent = '📍 ' + ZONE_NAMES[z0]; onZoneMusic(z0); }
+    return;
+  }
   if (chatOpen || reel) { me.moving = false; return; }
   let vx = 0, vy = 0;
   if (keys['KeyA'] || keys['ArrowLeft']) { vx = -1; me.dir = 'left'; }
@@ -956,6 +1088,12 @@ function updateMe(dt) {
     if (canStand(nx, me.y, me.boat)) me.x = nx;
     if (canStand(me.x, ny, me.boat)) me.y = ny;
     if (me.boat && Math.random() < dt * (turbo ? 18 : 6)) wake(me.x, me.y);
+    // andou pra longe do vendedor? loja fecha sozinha (no celular não tem ESC)
+    if ($('shop').style.display === 'block') {
+      const near = NPCS.some(n => (n.role === 'shop' || n.role === 'boatshop')
+        && Math.hypot(n.tx * TILE + 8 - me.x, n.ty * TILE + 8 - me.y) < 6 * TILE);
+      if (!near) $('shop').style.display = 'none';
+    }
     sendMove(false);
     wasMoving = true;
   } else if (wasMoving) {
@@ -1631,6 +1769,45 @@ function drawDecor(d, time) {
       }
       break;
     }
+    case 'cave': {
+      // boca de gruta secreta: morro de pedra com entrada escura
+      const [outl, base, lit, dk] = d.th === 'volcano'
+        ? ['#1a0e08', '#4a3028', '#6a4a38', '#2a1810']
+        : d.th === 'desert'
+          ? ['#5a4020', '#a8845c', '#c8a878', '#7a5c38']
+          : d.th === 'snow'
+            ? ['#3a4456', '#8a94a8', '#b4c0d4', '#5a6478']
+            : ['#3a3630', '#767268', '#98948a', '#54504a'];
+      const cx = d.x, by = d.y;
+      drawShadow(cx, by, 20, 3.5);
+      ctx.fillStyle = outl; // contorno do morro
+      ctx.beginPath(); ctx.moveTo(cx - 23, by + 1); ctx.lineTo(cx - 19, by - 14); ctx.lineTo(cx - 10, by - 24);
+      ctx.lineTo(cx + 3, by - 27); ctx.lineTo(cx + 14, by - 20); ctx.lineTo(cx + 21, by - 9); ctx.lineTo(cx + 23, by + 1);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = base;
+      ctx.beginPath(); ctx.moveTo(cx - 21, by); ctx.lineTo(cx - 17, by - 13); ctx.lineTo(cx - 9, by - 22);
+      ctx.lineTo(cx + 3, by - 25); ctx.lineTo(cx + 13, by - 18); ctx.lineTo(cx + 19, by - 8); ctx.lineTo(cx + 21, by);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = lit; // luz de cima-esquerda
+      ctx.beginPath(); ctx.moveTo(cx - 15, by - 12); ctx.lineTo(cx - 8, by - 20); ctx.lineTo(cx + 2, by - 23);
+      ctx.lineTo(cx + 8, by - 19); ctx.lineTo(cx - 2, by - 16); ctx.lineTo(cx - 10, by - 10); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = dk; // rachaduras e blocos
+      ctx.fillRect(cx - 16, by - 8, 5, 1.5); ctx.fillRect(cx + 10, by - 13, 5, 1.5);
+      ctx.fillRect(cx + 14, by - 5, 4, 1.5); ctx.fillRect(cx - 6, by - 21, 4, 1.2);
+      // entrada escura em arco
+      ctx.fillStyle = outl;
+      ctx.beginPath(); ctx.moveTo(cx - 8, by + 1); ctx.lineTo(cx - 8, by - 9); ctx.quadraticCurveTo(cx, by - 17, cx + 8, by - 9);
+      ctx.lineTo(cx + 8, by + 1); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#07070c';
+      ctx.beginPath(); ctx.moveTo(cx - 6, by + 1); ctx.lineTo(cx - 6, by - 8); ctx.quadraticCurveTo(cx, by - 14, cx + 6, by - 8);
+      ctx.lineTo(cx + 6, by + 1); ctx.closePath(); ctx.fill();
+      // brilho misterioso lá dentro
+      const tw = 0.5 + 0.5 * Math.sin(time * 2.4 + d.v * 9);
+      ctx.fillStyle = `rgba(140,220,255,${0.25 + tw * 0.3})`;
+      ctx.fillRect(cx - 1, by - 6 + tw * 2, 2, 2);
+      if (Math.hypot(d.x - me.x, d.y - me.y) < 48) drawLabel(cx, by - 32, '[E] entrar', '#7affc8');
+      break;
+    }
     case 'house': {
       // casa estilo Alundra: telhado projetado com beiral, empena e sombreamento 3D
       const x = d.x, yb = d.y;             // x = borda esquerda, yb = base da parede
@@ -1968,40 +2145,94 @@ function charSprite(name, dir, frame, fishing, npcColor, hue) {
 }
 
 const BOAT_SPRITES = {
-  remo: (() => {
-    const c = mkCanvas(36, 20);
+  remo: (() => { // bote de tábuas com banco e remos
+    const c = mkCanvas(38, 22);
     const g = c.getContext('2d');
-    g.fillStyle = '#6a4a22'; g.beginPath(); g.ellipse(18, 10, 14.5, 8, 0, 0, 7); g.fill();
-    g.fillStyle = '#8a6434'; g.beginPath(); g.ellipse(18, 9.5, 13, 6.5, 0, 0, 7); g.fill();
-    g.fillStyle = '#a87c44'; g.beginPath(); g.ellipse(18, 9, 11, 5, 0, 0, 7); g.fill();
-    g.fillStyle = '#7a5830'; g.fillRect(6, 8, 24, 1); g.fillRect(8, 11, 20, 1);
-    g.fillStyle = '#c89858'; g.fillRect(12, 5, 12, 1.5);
+    g.fillStyle = '#42210f'; g.beginPath(); g.ellipse(19, 11, 16, 9, 0, 0, 7); g.fill(); // contorno
+    g.fillStyle = '#6a4a22'; g.beginPath(); g.ellipse(19, 11, 15, 8, 0, 0, 7); g.fill();
+    g.fillStyle = '#8a6434'; g.beginPath(); g.ellipse(19, 10.5, 13, 6.5, 0, 0, 7); g.fill();
+    g.fillStyle = '#b08a50'; g.beginPath(); g.ellipse(19, 10, 11, 5, 0, 0, 7); g.fill();
+    g.fillStyle = '#77522a'; g.fillRect(7, 8.5, 24, 1); g.fillRect(9, 12, 20, 1); // tábuas internas
+    g.fillStyle = '#dcac6c'; g.fillRect(6, 6, 26, 1);
+    g.fillStyle = '#c89858'; g.fillRect(12, 5.5, 14, 2); // banco
+    g.strokeStyle = '#5a4224'; g.lineWidth = 2; // remos cruzados
+    g.beginPath(); g.moveTo(6, 4); g.lineTo(14, 12); g.moveTo(32, 4); g.lineTo(24, 12); g.stroke();
+    g.fillStyle = '#8a6434'; g.fillRect(4, 1.5, 4, 4); g.fillRect(30, 1.5, 4, 4); // pás
     return c;
   })(),
-  lancha: (() => {
-    const c = mkCanvas(38, 20);
+  lancha: (() => { // lancha esportiva com motor
+    const c = mkCanvas(42, 22);
     const g = c.getContext('2d');
-    g.fillStyle = '#c8ccd4'; g.beginPath(); g.ellipse(19, 11, 17, 7.5, 0, 0, 7); g.fill();
-    g.fillStyle = '#f0f2f6'; g.beginPath(); g.ellipse(19, 10, 15.5, 6, 0, 0, 7); g.fill();
+    g.fillStyle = '#5a636e'; g.beginPath(); g.ellipse(20, 12, 18.5, 8.5, 0, 0, 7); g.fill(); // contorno
+    g.fillStyle = '#c8ccd4'; g.beginPath(); g.ellipse(20, 12, 17.5, 7.5, 0, 0, 7); g.fill();
+    g.fillStyle = '#f4f6fa'; g.beginPath(); g.ellipse(20, 11, 16, 6, 0, 0, 7); g.fill();
     g.save();
-    g.beginPath(); g.ellipse(19, 10, 15.5, 6, 0, 0, 7); g.clip();
-    g.fillStyle = '#3a78c9'; g.fillRect(2, 11, 34, 2.5);
+    g.beginPath(); g.ellipse(20, 11, 16, 6, 0, 0, 7); g.clip();
+    g.fillStyle = '#e84040'; g.fillRect(2, 12.5, 38, 2.6); // faixa esportiva
+    g.fillStyle = '#3a78c9'; g.fillRect(2, 15.1, 38, 1.4);
+    g.fillStyle = '#d4dae4'; g.fillRect(4, 5, 12, 4); // proa
     g.restore();
-    g.fillStyle = '#9adcf0'; g.fillRect(24, 5, 8, 4); // para-brisa
-    g.strokeStyle = '#8aa'; g.strokeRect(24, 5, 8, 4);
+    g.fillStyle = '#9adcf0'; g.fillRect(24, 5, 9, 4.5); // para-brisa
+    g.strokeStyle = '#5a636e'; g.lineWidth = 1; g.strokeRect(24, 5, 9, 4.5);
+    g.fillStyle = '#3a3f48'; g.fillRect(36, 8, 4, 7); // motor de popa
+    g.fillStyle = '#5a636e'; g.fillRect(36, 8, 4, 2);
     return c;
   })(),
-  veleiro: (() => {
-    const c = mkCanvas(40, 46);
+  veleiro: (() => { // CARAVELA: casco de tábuas, castelo de popa, 2 mastros, velas e bandeira
+    const c = mkCanvas(56, 64);
     const g = c.getContext('2d');
-    g.fillStyle = '#7a4a2a'; g.beginPath(); g.ellipse(20, 38, 17, 7, 0, 0, 7); g.fill();
-    g.fillStyle = '#9a6438'; g.beginPath(); g.ellipse(20, 37, 15, 5.5, 0, 0, 7); g.fill();
-    g.fillStyle = '#c89858'; g.fillRect(8, 34, 24, 1.5);
-    g.fillStyle = '#5a4224'; g.fillRect(19, 4, 2, 32); // mastro
-    g.fillStyle = '#f4f0e4'; // velas
-    g.beginPath(); g.moveTo(21, 5); g.lineTo(21, 30); g.lineTo(36, 30); g.closePath(); g.fill();
-    g.beginPath(); g.moveTo(18, 8); g.lineTo(18, 28); g.lineTo(7, 28); g.closePath(); g.fill();
-    g.fillStyle = '#e84040'; g.beginPath(); g.moveTo(20, 4); g.lineTo(20, 1); g.lineTo(27, 2.5); g.closePath(); g.fill();
+    // casco
+    g.fillStyle = '#3a1e0c';
+    g.beginPath(); g.moveTo(4, 46); g.quadraticCurveTo(6, 60, 28, 61); g.quadraticCurveTo(50, 60, 52, 46);
+    g.lineTo(48, 42) ; g.lineTo(8, 42); g.closePath(); g.fill();
+    g.fillStyle = '#6a4a22';
+    g.beginPath(); g.moveTo(6, 45); g.quadraticCurveTo(8, 58, 28, 59); g.quadraticCurveTo(48, 58, 50, 45);
+    g.lineTo(46, 43); g.lineTo(10, 43); g.closePath(); g.fill();
+    g.fillStyle = '#8a6434'; g.fillRect(8, 44, 40, 5);
+    g.fillStyle = '#77522a'; g.fillRect(7, 49, 42, 1.5); g.fillRect(9, 53, 38, 1.5); // tábuas do casco
+    g.fillStyle = '#dcac6c'; g.fillRect(8, 43, 40, 1.5); // borda iluminada
+    // castelo de popa (traseira elevada)
+    g.fillStyle = '#5a3a1a'; g.fillRect(36, 36, 14, 9);
+    g.fillStyle = '#8a6434'; g.fillRect(37, 37, 12, 7);
+    g.fillStyle = '#ffd24a'; g.fillRect(39, 39, 2, 2); g.fillRect(44, 39, 2, 2); // janelinhas
+    // convés
+    g.fillStyle = '#b08a50'; g.fillRect(10, 44, 26, 4);
+    // mastro principal + vela quadrada com emblema
+    g.fillStyle = '#3a2410'; g.fillRect(21, 4, 3, 42);
+    g.fillStyle = '#5a4224'; g.fillRect(21, 4, 1, 42);
+    g.fillStyle = '#f2ead2';
+    g.beginPath(); g.moveTo(8, 10); g.quadraticCurveTo(22.5, 16, 37, 10);
+    g.lineTo(37, 30); g.quadraticCurveTo(22.5, 37, 8, 30); g.closePath(); g.fill();
+    g.fillStyle = '#ddd2b2';
+    g.beginPath(); g.moveTo(8, 10); g.quadraticCurveTo(22.5, 16, 37, 10); g.lineTo(37, 14);
+    g.quadraticCurveTo(22.5, 20, 8, 14); g.closePath(); g.fill();
+    g.strokeStyle = '#c9bc96'; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(8, 20); g.quadraticCurveTo(22.5, 26, 37, 20); g.stroke();
+    // emblema do peixe na vela
+    g.fillStyle = '#3a78c9';
+    g.beginPath(); g.ellipse(22, 23, 5, 3, 0, 0, 7); g.fill();
+    g.beginPath(); g.moveTo(26, 23); g.lineTo(29.5, 20.5); g.lineTo(29.5, 25.5); g.closePath(); g.fill();
+    // verga (trave da vela)
+    g.fillStyle = '#3a2410'; g.fillRect(6, 8, 33, 2);
+    // mastro de proa (menor) + bujarrona triangular
+    g.fillStyle = '#3a2410'; g.fillRect(9, 20, 2.4, 26);
+    g.fillStyle = '#f2ead2';
+    g.beginPath(); g.moveTo(10, 22); g.lineTo(10, 40); g.lineTo(1, 40); g.closePath(); g.fill();
+    g.fillStyle = '#ddd2b2';
+    g.beginPath(); g.moveTo(10, 22); g.lineTo(10, 28); g.lineTo(6, 32); g.closePath(); g.fill();
+    // cesto da gávea (vigia)
+    g.fillStyle = '#5a3a1a'; g.fillRect(19, 6, 7, 3.5);
+    g.fillStyle = '#8a6434'; g.fillRect(19.5, 6.5, 6, 2.5);
+    // bandeira vermelha no topo
+    g.fillStyle = '#e84040';
+    g.beginPath(); g.moveTo(22, 4); g.lineTo(22, 0.5); g.lineTo(31, 2.2); g.closePath(); g.fill();
+    // cordame
+    g.strokeStyle = 'rgba(60,40,20,.55)'; g.lineWidth = 0.8;
+    g.beginPath();
+    g.moveTo(22.5, 6); g.lineTo(46, 43);
+    g.moveTo(22.5, 6); g.lineTo(9, 42);
+    g.moveTo(10, 21); g.lineTo(4, 44);
+    g.stroke();
     return c;
   })(),
 };
