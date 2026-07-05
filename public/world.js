@@ -32,8 +32,8 @@
   };
 
   const NPCS = [
-    { id: 'ze',       name: 'Teodoro',          role: 'shop',     island: 'vila', tx: 204, ty: 297 },
-    { id: 'nino',     name: 'Capitão Nereu',    role: 'boatshop', island: 'vila', tx: 210, ty: 302 },
+    { id: 'ze',       name: 'Teodoro',          role: 'shop',     island: 'vila', tx: 202, ty: 296 },
+    { id: 'nino',     name: 'Capitão Nereu',    role: 'boatshop', island: 'vila', tx: 208, ty: 301 },
     { id: 'bia',      name: 'Beatriz',          role: 'quest', island: 'vila',    tx: 194, ty: 304 },
     { id: 'pedro',    name: 'Bartolomeu',       role: 'quest', island: 'vila',    tx: 246, ty: 304 },
     { id: 'ilo',      name: 'Ismael',           role: 'quest', island: 'farol',   tx: 397, ty: 304 },
