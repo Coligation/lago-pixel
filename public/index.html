@@ -25,6 +25,8 @@
   #xpbar { height: 7px; background: #223; border-radius: 4px; margin-top: 5px; overflow: hidden; }
   #xpfill { height: 100%; width: 0; background: linear-gradient(90deg, #4ac0ff, #7affc8); transition: width .3s; }
   #hud .sub { color: #9fc5e8; font-size: 11.5px; margin-top: 3px; }
+  /* moeda desenhada (o emoji de moeda vira bola cinza/quadrado em vários aparelhos) */
+  .coinimg { width: .95em; height: .95em; vertical-align: -.09em; display: inline-block; }
 
   #zonelabel { top: 10px; left: 50%; transform: translateX(-50%); font-size: 14px; font-weight: 700;
     padding: 5px 18px; position: absolute; color: #ffe9a0; pointer-events: none; }
@@ -178,7 +180,7 @@
 
   <div id="hud" class="panel">
     <div class="name">—</div>
-    <div style="font-size:13px">Nível <span id="hud-level">1</span> · <span class="coins"><span id="hud-coins">0</span> 🪙</span></div>
+    <div style="font-size:13px">Nível <span id="hud-level">1</span> · <span class="coins"><span id="hud-coins">0</span> <svg class="coinimg" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5.6" fill="#7a4c0e"/><circle cx="6" cy="6" r="4.8" fill="#ffd24a"/><circle cx="6" cy="6" r="3.4" fill="#f0b02c"/><path d="M6 3.4l.8 1.6 1.8.2-1.3 1.2.3 1.8L6 7.3l-1.6.9.3-1.8-1.3-1.2 1.8-.2z" fill="#ffe9a0"/></svg></span></div>
     <div id="xpbar"><div id="xpfill"></div></div>
     <div class="sub" id="hud-gear">🎣 — · 🧵 —</div>
     <div class="sub" id="hud-boat">🚣 sem barco</div>
@@ -201,7 +203,7 @@
     <div class="tabs" id="invtabs"></div>
     <div id="invtab-bucket">
       <div id="invlist"></div>
-      <div style="margin-top:8px; font-size:12.5px;">Total: <b class="coins" id="invtotal">0 🪙</b> — venda em qualquer loja do arquipélago. "Soltar" deixa o peixe no chão pra um amigo pegar!</div>
+      <div style="margin-top:8px; font-size:12.5px;">Total: <b class="coins"><span id="invtotal">0</span> <svg class="coinimg" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5.6" fill="#7a4c0e"/><circle cx="6" cy="6" r="4.8" fill="#ffd24a"/><circle cx="6" cy="6" r="3.4" fill="#f0b02c"/><path d="M6 3.4l.8 1.6 1.8.2-1.3 1.2.3 1.8L6 7.3l-1.6.9.3-1.8-1.3-1.2 1.8-.2z" fill="#ffe9a0"/></svg></b> — venda em qualquer loja do arquipélago. "Soltar" deixa o peixe no chão pra um amigo pegar!</div>
     </div>
     <div id="invtab-gear" style="display:none"></div>
   </div>
@@ -237,7 +239,7 @@
 
   <div id="money" class="panel">
     <div class="mclose" id="money-x">✕</div>
-    <div class="val"><span id="money-val">0</span> 🪙</div>
+    <div class="val"><span id="money-val">0</span> <svg class="coinimg" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5.6" fill="#7a4c0e"/><circle cx="6" cy="6" r="4.8" fill="#ffd24a"/><circle cx="6" cy="6" r="3.4" fill="#f0b02c"/><path d="M6 3.4l.8 1.6 1.8.2-1.3 1.2.3 1.8L6 7.3l-1.6.9.3-1.8-1.3-1.2 1.8-.2z" fill="#ffe9a0"/></svg></div>
     <div class="goal" id="money-goal"></div>
   </div>
 
@@ -329,7 +331,7 @@
     </div>
   </div>
 </div>
-<script src="world.js?v=9"></script>
-<script src="game.js?v=9"></script>
+<script src="world.js?v=10"></script>
+<script src="game.js?v=10"></script>
 </body>
 </html>

@@ -268,7 +268,7 @@ function checkAchievements(p) {
     pr.achv.push(a.id);
     pr.coins += a.reward;
     saveDirty = true;
-    send(p.ws, 'toast', { text: `🏆 Conquista: ${a.name}! +${a.reward} 🪙` });
+    send(p.ws, 'toast', { text: `🏆 Conquista: ${a.name}! +${a.reward} moedas` });
     broadcast('announce', { text: `🏆 ${p.name} conquistou "${a.name}"!`, rarity: 'epico' }, p.ws);
   }
 }

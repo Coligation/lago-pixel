@@ -241,6 +241,9 @@ function onZoneMusic(zone) {
 // ---------------------------------------------------------------- UI helpers
 
 const $ = (id) => document.getElementById(id);
+// moeda em SVG — o emoji de moeda renderiza como bola cinza/quadrado em vários aparelhos
+const COIN = '<svg class="coinimg" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5.6" fill="#7a4c0e"/><circle cx="6" cy="6" r="4.8" fill="#ffd24a"/><circle cx="6" cy="6" r="3.4" fill="#f0b02c"/><path d="M6 3.4l.8 1.6 1.8.2-1.3 1.2.3 1.8L6 7.3l-1.6.9.3-1.8-1.3-1.2 1.8-.2z" fill="#ffe9a0"/></svg>';
+
 function toast(text, ms = 2200) {
   const t = $('toast');
   t.textContent = text; t.style.display = 'block';
@@ -442,7 +445,7 @@ function refreshInventory() {
     const info = document.createElement('span');
     info.innerHTML = `<span style="color:${r.color}">${f.name}</span> <span style="color:#9ab">${f.weight} kg</span>`;
     const right = document.createElement('span');
-    right.innerHTML = `<b style="color:#ffd24a">${f.value} 🪙</b> `;
+    right.innerHTML = `<b style="color:#ffd24a">${f.value} ${COIN}</b> `;
     const btn = document.createElement('button');
     btn.className = 'btn small'; btn.textContent = 'Soltar';
     btn.onclick = () => send({ type: 'drop', index: i });
@@ -451,7 +454,7 @@ function refreshInventory() {
     list.appendChild(row);
   });
   if (!profile.inventory.length) list.innerHTML = '<div class="fishrow">Balde vazio... vá pescar!</div>';
-  $('invtotal').textContent = total.toLocaleString('pt-BR') + ' 🪙';
+  $('invtotal').textContent = total.toLocaleString('pt-BR');
 }
 
 // aba Equipamento: troca vara/linha/barco de qualquer lugar (só o que você possui)
@@ -735,7 +738,8 @@ function shopSection(box, title, kind, items, ownedId) {
       const btn = document.createElement('button');
       btn.className = 'btn';
       const locked = kind !== 'bait' && profile.level < item.level;
-      btn.textContent = locked ? `nível ${item.level} 🔒` : item.price.toLocaleString('pt-BR') + ' 🪙';
+      if (locked) btn.textContent = `nível ${item.level} 🔒`;
+      else btn.innerHTML = item.price.toLocaleString('pt-BR') + ' ' + COIN;
       btn.disabled = locked || profile.coins < item.price;
       btn.onclick = () => send({ type: 'buy', kind, id });
       el.appendChild(btn);
@@ -751,7 +755,7 @@ function refreshShop() {
   if (!shopStock) return;
   const total = profile.inventory.reduce((s, f) => s + f.value, 0);
   $('selldesc').textContent = profile.inventory.length
-    ? `${profile.inventory.length} peixes = ${total.toLocaleString('pt-BR')} 🪙` : 'balde vazio';
+    ? `${profile.inventory.length} peixes = ${total.toLocaleString('pt-BR')} moedas` : 'balde vazio';
   $('sellbtn').disabled = !profile.inventory.length;
   $('shoptitle').textContent = shopStock.title;
   $('shopsellrow').style.display = 'flex'; // todo vendedor compra peixe
@@ -780,8 +784,8 @@ function refreshAchievements() {
     const el = document.createElement('div');
     el.className = 'questitem';
     el.innerHTML = got
-      ? `<span class="prog">🏆 ${a.name}</span> — <span style="color:#9ab">${a.desc}</span> <span style="color:#ffd24a">✓ +${a.reward} 🪙</span>`
-      : `<span style="color:#678">🔒 ${a.name}</span> — <span style="color:#567">${a.desc} (+${a.reward} 🪙)</span>`;
+      ? `<span class="prog">🏆 ${a.name}</span> — <span style="color:#9ab">${a.desc}</span> <span style="color:#ffd24a">✓ +${a.reward} ${COIN}</span>`
+      : `<span style="color:#678">🔒 ${a.name}</span> — <span style="color:#567">${a.desc} (+${a.reward} ${COIN})</span>`;
     list.appendChild(el);
   }
 }
@@ -805,8 +809,8 @@ function refreshMoneyGoal() {
   if (!best) { el.textContent = '👑 Você tem o melhor de tudo!'; return; }
   const falta = best.price - profile.coins;
   const place = catalog.where[best.kind + ':' + best.id];
-  el.textContent = falta > 0
-    ? `Faltam ${falta.toLocaleString('pt-BR')} 🪙 → ${best.name}`
+  el.innerHTML = falta > 0
+    ? `Faltam ${falta.toLocaleString('pt-BR')} ${COIN} → ${best.name}`
     : `💡 ${best.name} à venda: ${place}`;
 }
 
@@ -904,7 +908,7 @@ function connect(payload) {
         refreshHUD();
         break;
       case 'escaped': fish.phase = 'idle'; reel = null; toast(m.reason); sfx.fail(); break;
-      case 'sold': profile = m.you; refreshHUD(); sfx.coin(); toast(`Vendeu tudo por ${m.total.toLocaleString('pt-BR')} 🪙!`); break;
+      case 'sold': profile = m.you; refreshHUD(); sfx.coin(); toast(`Vendeu tudo por ${m.total.toLocaleString('pt-BR')} moedas!`); break;
       case 'bought': profile = m.you; refreshHUD(); break;
       case 'levelup': sfx.level(); toast(`⭐ Nível ${m.level}!`); confetti(); break;
       case 'toast': toast(m.text); break;
@@ -3331,7 +3335,20 @@ function drawCatchCard(now) {
   ctx.fillStyle = '#ccc'; ctx.font = '13px monospace';
   ctx.fillText(`${r.label} · ${f.weight} kg · ${ZONE_NAMES[f.zone]}`, cx, cy + 6);
   ctx.fillStyle = '#ffd24a'; ctx.font = 'bold 14px monospace';
-  ctx.fillText(`+${f.value} 🪙 no balde`, cx, cy + 28);
+  { // moeda desenhada no canvas (emoji falha em muitos aparelhos)
+    const t1 = `+${f.value.toLocaleString('pt-BR')} `, t2 = ' no balde';
+    const w1 = ctx.measureText(t1).width, w2 = ctx.measureText(t2).width, cw = 13;
+    let x0 = cx - (w1 + cw + w2) / 2;
+    ctx.textAlign = 'left';
+    ctx.fillText(t1, x0, cy + 28); x0 += w1;
+    ctx.fillStyle = '#7a4c0e'; ctx.beginPath(); ctx.arc(x0 + 6.5, cy + 23, 6.5, 0, 7); ctx.fill();
+    ctx.fillStyle = '#ffd24a'; ctx.beginPath(); ctx.arc(x0 + 6.5, cy + 23, 5.5, 0, 7); ctx.fill();
+    ctx.fillStyle = '#f0b02c'; ctx.beginPath(); ctx.arc(x0 + 6.5, cy + 23, 3.9, 0, 7); ctx.fill();
+    ctx.fillStyle = '#ffe9a0'; ctx.beginPath(); ctx.arc(x0 + 4.4, cy + 20.8, 1.5, 0, 7); ctx.fill();
+    x0 += cw;
+    ctx.fillStyle = '#ffd24a'; ctx.fillText(t2, x0, cy + 28);
+    ctx.textAlign = 'center';
+  }
   ctx.restore();
 }
 
