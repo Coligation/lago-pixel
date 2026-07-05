@@ -37,7 +37,7 @@ for (let ty = 0; ty < H; ty++) for (let tx = 0; tx < W; tx++) {
     RENDER_MAP[ty * W + tx] = t === T.TALL ? T.GRASS : T.SAV;
     DECOR.push({ type: 'bush', x: tx * TILE + 8, y: ty * TILE + 14, v: h2(tx, ty), th: t === T.TALL ? 'grass' : 'savanna' });
   }
-  if (t === T.FAROLBASE) RENDER_MAP[ty * W + tx] = T.STONE;
+  // FAROLBASE mantém tile próprio (calçada clara — destaca a entrada da torre)
   if (t === T.CAVE) {
     const theme = WORLD.nearestIsland(tx, ty).isl.theme;
     RENDER_MAP[ty * W + tx] = THEME_GROUND[theme];
@@ -69,7 +69,24 @@ for (let ty = 0; ty < H; ty++) for (let tx = 0; tx < W; tx++) {
   const far = ISLANDS.find(i => i.id === 'farol');
   DECOR.push({ type: 'farol', x: far.cx * TILE + 8, y: (far.cy + 1) * TILE, v: 0, smokeT: 0 });
 }
-const rTileAt = (tx, ty) => (tx < 0 || ty < 0 || tx >= W || ty >= H) ? T.DEEP : RENDER_MAP[ty * W + tx];
+// salas internas (farol + grutas, no canto do mapa) só existem pra quem está dentro
+const HIDDEN_ROOMS = [WORLD.INTERIOR, ...WORLD.CAVES.map((c) => c.room)]
+  .map((r) => ({ x0: r.x0 - 1, y0: r.y0 - 1, x1: r.x1 + 1, y1: r.y1 + 1 }));
+const HR_MAXX = Math.max(...HIDDEN_ROOMS.map((r) => r.x1));
+const HR_MAXY = Math.max(...HIDDEN_ROOMS.map((r) => r.y1));
+let myRoom = null;
+function roomAtTile(tx, ty) {
+  if (tx > HR_MAXX || ty > HR_MAXY) return null;
+  for (const r of HIDDEN_ROOMS) if (tx >= r.x0 && tx <= r.x1 && ty >= r.y0 && ty <= r.y1) return r;
+  return null;
+}
+const roomAtPx = (x, y) => roomAtTile(Math.floor(x / TILE), Math.floor(y / TILE));
+const rTileAt = (tx, ty) => {
+  if (tx < 0 || ty < 0 || tx >= W || ty >= H) return T.DEEP;
+  const r = roomAtTile(tx, ty);
+  if (r && r !== myRoom) return T.DEEP;
+  return RENDER_MAP[ty * W + tx];
+};
 
 // ---------------------------------------------------------------- estado
 
@@ -272,6 +289,51 @@ $('set-sound').onclick = () => {
   toggleAmbience();
   $('set-sound').textContent = ambienceOn ? '🔊 Som: ligado' : '🔇 Som: desligado';
 };
+
+// ---------------------------------------------------------------- teclas configuráveis
+const KB_DEFAULT = { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', fish: 'Space',
+  interact: 'KeyE', bucket: 'KeyI', dex: 'KeyC', quests: 'KeyQ', bait: 'KeyB', sound: 'KeyM' };
+let KB = { ...KB_DEFAULT };
+try { KB = { ...KB_DEFAULT, ...JSON.parse(localStorage.getItem('lp_keys') || '{}') }; } catch { /* padrão */ }
+let rebinding = null;
+const KB_ACTIONS = [
+  ['up', '⬆ mover pra cima'], ['down', '⬇ mover pra baixo'], ['left', '⬅ mover pra esquerda'], ['right', '➡ mover pra direita'],
+  ['fish', '🎣 pescar / fisgar'], ['interact', '🗨️ interagir / embarcar'],
+  ['bucket', '🪣 balde'], ['dex', '📖 coleção'], ['quests', '📜 missões'],
+  ['bait', '🪱 trocar isca'], ['sound', '🔊 som'],
+];
+function keyLabel(code) {
+  if (code === 'Space') return 'ESPAÇO';
+  if (code.startsWith('Key')) return code.slice(3);
+  if (code.startsWith('Digit')) return code.slice(5);
+  return { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' }[code] || code;
+}
+function renderKeylist() {
+  const box = $('keylist');
+  box.innerHTML = '';
+  for (const [act, label] of KB_ACTIONS) {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:2px 0';
+    const sp = document.createElement('span');
+    sp.textContent = label;
+    row.appendChild(sp);
+    const b = document.createElement('button');
+    b.className = 'btn small';
+    b.textContent = rebinding === act ? 'aperte...' : keyLabel(KB[act]);
+    if (rebinding === act) b.style.background = '#8a6a1a';
+    b.onclick = () => { rebinding = rebinding === act ? null : act; renderKeylist(); };
+    row.appendChild(b);
+    box.appendChild(row);
+  }
+}
+$('key-reset').onclick = () => {
+  KB = { ...KB_DEFAULT };
+  localStorage.setItem('lp_keys', JSON.stringify(KB));
+  rebinding = null;
+  renderKeylist();
+  toast('⌨️ Teclas padrão restauradas!', 1600);
+};
+renderKeylist();
 // paleta de cores da roupa (fica salva no perfil do servidor)
 {
   const row = $('colorrow');
@@ -330,7 +392,7 @@ function refreshHUD() {
   $('hud-coins').textContent = profile.coins.toLocaleString('pt-BR');
   $('xpfill').style.width = Math.min(100, 100 * profile.xp / profile.xpNext) + '%';
   $('hud-gear').textContent = `🎣 ${catalog.rods[profile.rod].name} · 🧵 ${catalog.lines[profile.line].name}`;
-  $('hud-boat').textContent = profile.boat ? `🚣 ${catalog.boats[profile.boat].name}` : '🚣 sem barco (compre no Zé!)';
+  $('hud-boat').textContent = profile.boat ? `🚣 ${catalog.boats[profile.boat].name}` : '🚣 sem barco (compre no Capitão Nereu!)';
   const b = profile.activeBait;
   $('hud-bait').textContent = 'Isca: ' + (b && profile.baits[b] > 0 ? `${catalog.baits[b].name} (${profile.baits[b]})` : 'nenhuma');
   $('hud-bucket').textContent = profile.inventory.length;
@@ -412,7 +474,7 @@ function refreshGear() {
     if (!ids.length) {
       const el = document.createElement('div');
       el.className = 'fishrow';
-      el.textContent = kind === 'boat' ? 'Nenhum barco — compre no Mestre Nino!' : '—';
+      el.textContent = kind === 'boat' ? 'Nenhum barco — compre no Capitão Nereu!' : '—';
       box.appendChild(el);
       continue;
     }
@@ -595,7 +657,7 @@ function shopSection(box, title, kind, items, ownedId) {
   }
 }
 
-let shopMode = 'itens'; // 'itens' (Zé) ou 'barcos' (Nino) — muda título e aba inicial
+let shopMode = 'itens'; // 'itens' (Teodoro) ou 'barcos' (Nereu) — muda título e aba inicial
 let shopTab = 'rod';
 const SHOP_TABS = [['rod', '🎣 Varas'], ['line', '🧵 Linhas'], ['bait', '🪱 Iscas'], ['boat', '⛵ Barcos']];
 function refreshShop() {
@@ -604,7 +666,7 @@ function refreshShop() {
     ? `${profile.inventory.length} peixes = ${total.toLocaleString('pt-BR')} 🪙` : 'balde vazio';
   $('sellbtn').disabled = !profile.inventory.length;
   const itens = shopMode === 'itens';
-  $('shoptitle').textContent = itens ? '🐟 Peixe & Cia — Zé do Peixe' : '⛵ Barcos do Nino';
+  $('shoptitle').textContent = itens ? '🐟 Peixe & Cia — Teodoro' : '⚓ Estaleiro do Capitão Nereu';
   $('shopsellrow').style.display = itens ? 'flex' : 'none';
   renderTabs($('shoptabs'), SHOP_TABS, shopTab, (k) => { shopTab = k; refreshShop(); });
   const sections = {
@@ -767,20 +829,32 @@ addEventListener('keydown', (e) => {
     return;
   }
   if ($('login').style.display !== 'none') return;
+  if (rebinding) { // capturando nova tecla no menu de configurações
+    e.preventDefault();
+    if (e.code !== 'Escape') {
+      const prev = Object.keys(KB).find((k) => KB[k] === e.code);
+      if (prev && prev !== rebinding) KB[prev] = KB[rebinding]; // troca se já estava em uso
+      KB[rebinding] = e.code;
+      localStorage.setItem('lp_keys', JSON.stringify(KB));
+    }
+    rebinding = null;
+    renderKeylist();
+    return;
+  }
   keys[e.code] = true;
-  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code) || e.code === KB.fish) e.preventDefault();
 
-  if (e.code === 'Space') {
+  if (e.code === KB.fish) {
     if (reel) return;
     if (fish.phase === 'idle') tryCast();
     else send({ type: 'hook' });
   }
-  if (e.code === 'KeyE') interact();
-  if (e.code === 'KeyI') togglePanel('inventory');
-  if (e.code === 'KeyC') togglePanel('dex');
-  if (e.code === 'KeyQ') togglePanel('quests');
-  if (e.code === 'KeyB') cycleBait();
-  if (e.code === 'KeyM') toggleAmbience();
+  if (e.code === KB.interact) interact();
+  if (e.code === KB.bucket) togglePanel('inventory');
+  if (e.code === KB.dex) togglePanel('dex');
+  if (e.code === KB.quests) togglePanel('quests');
+  if (e.code === KB.bait) cycleBait();
+  if (e.code === KB.sound) toggleAmbience();
   if (e.code === 'Escape') closeModals();
   if (e.key === 'Enter') { chatOpen = true; const inp = $('chatinput'); inp.style.display = 'block'; inp.focus(); e.preventDefault(); }
 });
@@ -1054,10 +1128,10 @@ function updateMe(dt) {
   }
   if (chatOpen || reel) { me.moving = false; return; }
   let vx = 0, vy = 0;
-  if (keys['KeyA'] || keys['ArrowLeft']) { vx = -1; me.dir = 'left'; }
-  else if (keys['KeyD'] || keys['ArrowRight']) { vx = 1; me.dir = 'right'; }
-  if (keys['KeyW'] || keys['ArrowUp']) { vy = -1; if (!vx) me.dir = 'up'; }
-  else if (keys['KeyS'] || keys['ArrowDown']) { vy = 1; if (!vx) me.dir = 'down'; }
+  if (keys[KB.left] || keys['ArrowLeft']) { vx = -1; me.dir = 'left'; }
+  else if (keys[KB.right] || keys['ArrowRight']) { vx = 1; me.dir = 'right'; }
+  if (keys[KB.up] || keys['ArrowUp']) { vy = -1; if (!vx) me.dir = 'up'; }
+  else if (keys[KB.down] || keys['ArrowDown']) { vy = 1; if (!vx) me.dir = 'down'; }
 
   if (joy.active && (Math.abs(joy.vx) > 0.15 || Math.abs(joy.vy) > 0.15)) {
     vx = joy.vx; vy = joy.vy;
@@ -1142,7 +1216,7 @@ function updateReel(dt) {
   r.fishPos += r.fishVel * dt;
   if (r.fishPos < 0) { r.fishPos = 0; r.fishVel = Math.abs(r.fishVel); }
   if (r.fishPos > 1) { r.fishPos = 1; r.fishVel = -Math.abs(r.fishVel); }
-  const hold = keys['Space'] || gpA;
+  const hold = keys[KB.fish] || keys['Space'] || gpA; // Space extra: botão de toque simula ele
   r.zoneVel += (hold ? 2.6 : -2.6) * dt;
   r.zoneVel *= 0.92;
   r.zonePos += r.zoneVel * dt;
@@ -1481,6 +1555,14 @@ function buildAtlas() {
     g.fillRect(0, 7, 16, 1); g.fillRect(((r() * 8) | 0) + 3, 0, 1, 7); g.fillRect(((r() * 8) | 0) + 5, 8, 1, 8);
     g.fillStyle = '#c4c1cf'; g.fillRect(1, 1, 6, 1); g.fillRect(9, 9, 5, 1);
     speck(g, r, 3, ['#9c99aa'], 2, 1);
+  });
+
+  SPR[T.FAROLBASE] = mk4((g, r) => {
+    g.fillStyle = '#e8e2d0'; g.fillRect(0, 0, 16, 16); // calçada creme do farol
+    g.fillStyle = '#cfc7b0';
+    g.fillRect(0, 7, 16, 1); g.fillRect(((r() * 8) | 0) + 3, 0, 1, 7); g.fillRect(((r() * 8) | 0) + 5, 8, 1, 8);
+    g.fillStyle = '#f8f4ea'; g.fillRect(1, 1, 6, 1); g.fillRect(9, 9, 5, 1);
+    speck(g, r, 2, ['#d8a898', '#c8bfa6'], 2, 1);
   });
 
   // água viva com bandas de onda + brilhos
@@ -1920,11 +2002,25 @@ function drawDecor(d, time) {
         ctx.fillStyle = 'rgba(0,0,0,.12)';
         ctx.fillRect(bx + w2 / 2 - 4, yy - 11, 4, 11);
       }
-      // base de pedra
-      ctx.fillStyle = '#8a8a92'; ctx.fillRect(bx - 12, by - 10, 24, 12);
-      ctx.fillStyle = '#9a9aa2'; ctx.fillRect(bx - 12, by - 10, 24, 3);
-      ctx.fillStyle = '#6a6a72'; ctx.fillRect(bx - 4, by - 8, 8, 10); // porta
-      ctx.fillStyle = '#5a5a62'; ctx.fillRect(bx - 3, by - 7, 6, 9);
+      // base de alvenaria clara com faixa vermelha (destoa das rochas da ilha)
+      ctx.fillStyle = '#3a3a44'; ctx.fillRect(bx - 14, by - 12, 28, 15);
+      ctx.fillStyle = '#f0ead8'; ctx.fillRect(bx - 13, by - 11, 26, 13);
+      ctx.fillStyle = '#d8d0ba'; // juntas das pedras
+      ctx.fillRect(bx - 13, by - 5, 26, 1.2); ctx.fillRect(bx - 7, by - 11, 1, 6); ctx.fillRect(bx + 6, by - 5, 1, 7);
+      ctx.fillStyle = '#e84040'; ctx.fillRect(bx - 13, by - 11, 26, 2.6);
+      ctx.fillStyle = 'rgba(0,0,0,.14)'; ctx.fillRect(bx + 8, by - 11, 5, 13);
+      // porta de madeira em arco + lampião aceso
+      ctx.fillStyle = '#2a1608';
+      ctx.beginPath(); ctx.moveTo(bx - 5, by + 2); ctx.lineTo(bx - 5, by - 7);
+      ctx.quadraticCurveTo(bx, by - 12, bx + 5, by - 7); ctx.lineTo(bx + 5, by + 2); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#8a5a28';
+      ctx.beginPath(); ctx.moveTo(bx - 3.6, by + 2); ctx.lineTo(bx - 3.6, by - 6.4);
+      ctx.quadraticCurveTo(bx, by - 10, bx + 3.6, by - 6.4); ctx.lineTo(bx + 3.6, by + 2); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#6a4420'; ctx.fillRect(bx - 0.6, by - 9, 1.2, 11);
+      ctx.fillStyle = '#ffd24a'; ctx.fillRect(bx + 1.6, by - 3.5, 1.6, 1.6);
+      ctx.fillStyle = '#3a3a44'; ctx.fillRect(bx - 2, by - 15, 4, 2.6);
+      ctx.fillStyle = '#ffe9a0'; ctx.fillRect(bx - 1.2, by - 14.4, 2.4, 1.6);
+      if (Math.hypot(bx - me.x, by - me.y) < 52) drawLabel(bx, by - 20, '[E] entrar', '#7affc8');
       // galeria + lanterna
       const ly = by - 65;
       ctx.fillStyle = '#3a3a44'; ctx.fillRect(bx - 9, ly, 18, 3);
@@ -2026,7 +2122,7 @@ function drawCharFrontal(g, c, dir, frame, fishing) {
   g.fillStyle = c.shirtD; g.fillRect(15, 13, 3, 10);
   g.fillStyle = 'rgba(255,255,255,.28)'; g.fillRect(6, 13, 2, 9);
   g.fillStyle = '#4a3418'; g.fillRect(6, 20, 12, 2);
-  g.fillStyle = '#ffd24a'; g.fillRect(11, 20, 2, 2);
+  if (dir !== 'up') { g.fillStyle = '#ffd24a'; g.fillRect(11, 20, 2, 2); } // fivela só na frente
   g.fillStyle = c.shirtD; g.fillRect(6, 22, 12, 1);
   // braços (os dois visíveis)
   g.fillStyle = c.skin;
@@ -2144,108 +2240,363 @@ function charSprite(name, dir, frame, fishing, npcColor, hue) {
   return s;
 }
 
-const BOAT_SPRITES = {
-  remo: (() => { // bote de tábuas com banco e remos
-    const c = mkCanvas(38, 22);
-    const g = c.getContext('2d');
-    g.fillStyle = '#42210f'; g.beginPath(); g.ellipse(19, 11, 16, 9, 0, 0, 7); g.fill(); // contorno
-    g.fillStyle = '#6a4a22'; g.beginPath(); g.ellipse(19, 11, 15, 8, 0, 0, 7); g.fill();
-    g.fillStyle = '#8a6434'; g.beginPath(); g.ellipse(19, 10.5, 13, 6.5, 0, 0, 7); g.fill();
-    g.fillStyle = '#b08a50'; g.beginPath(); g.ellipse(19, 10, 11, 5, 0, 0, 7); g.fill();
-    g.fillStyle = '#77522a'; g.fillRect(7, 8.5, 24, 1); g.fillRect(9, 12, 20, 1); // tábuas internas
-    g.fillStyle = '#dcac6c'; g.fillRect(6, 6, 26, 1);
-    g.fillStyle = '#c89858'; g.fillRect(12, 5.5, 14, 2); // banco
-    g.strokeStyle = '#5a4224'; g.lineWidth = 2; // remos cruzados
-    g.beginPath(); g.moveTo(6, 4); g.lineTo(14, 12); g.moveTo(32, 4); g.lineTo(24, 12); g.stroke();
-    g.fillStyle = '#8a6434'; g.fillRect(4, 1.5, 4, 4); g.fillRect(30, 1.5, 4, 4); // pás
-    return c;
-  })(),
-  lancha: (() => { // lancha esportiva com motor
-    const c = mkCanvas(42, 22);
-    const g = c.getContext('2d');
-    g.fillStyle = '#5a636e'; g.beginPath(); g.ellipse(20, 12, 18.5, 8.5, 0, 0, 7); g.fill(); // contorno
-    g.fillStyle = '#c8ccd4'; g.beginPath(); g.ellipse(20, 12, 17.5, 7.5, 0, 0, 7); g.fill();
-    g.fillStyle = '#f4f6fa'; g.beginPath(); g.ellipse(20, 11, 16, 6, 0, 0, 7); g.fill();
-    g.save();
-    g.beginPath(); g.ellipse(20, 11, 16, 6, 0, 0, 7); g.clip();
-    g.fillStyle = '#e84040'; g.fillRect(2, 12.5, 38, 2.6); // faixa esportiva
-    g.fillStyle = '#3a78c9'; g.fillRect(2, 15.1, 38, 1.4);
-    g.fillStyle = '#d4dae4'; g.fillRect(4, 5, 12, 4); // proa
-    g.restore();
-    g.fillStyle = '#9adcf0'; g.fillRect(24, 5, 9, 4.5); // para-brisa
-    g.strokeStyle = '#5a636e'; g.lineWidth = 1; g.strokeRect(24, 5, 9, 4.5);
-    g.fillStyle = '#3a3f48'; g.fillRect(36, 8, 4, 7); // motor de popa
-    g.fillStyle = '#5a636e'; g.fillRect(36, 8, 4, 2);
-    return c;
-  })(),
-  veleiro: (() => { // CARAVELA: casco de tábuas, castelo de popa, 2 mastros, velas e bandeira
-    const c = mkCanvas(56, 64);
-    const g = c.getContext('2d');
-    // casco
-    g.fillStyle = '#3a1e0c';
-    g.beginPath(); g.moveTo(4, 46); g.quadraticCurveTo(6, 60, 28, 61); g.quadraticCurveTo(50, 60, 52, 46);
-    g.lineTo(48, 42) ; g.lineTo(8, 42); g.closePath(); g.fill();
-    g.fillStyle = '#6a4a22';
-    g.beginPath(); g.moveTo(6, 45); g.quadraticCurveTo(8, 58, 28, 59); g.quadraticCurveTo(48, 58, 50, 45);
-    g.lineTo(46, 43); g.lineTo(10, 43); g.closePath(); g.fill();
-    g.fillStyle = '#8a6434'; g.fillRect(8, 44, 40, 5);
-    g.fillStyle = '#77522a'; g.fillRect(7, 49, 42, 1.5); g.fillRect(9, 53, 38, 1.5); // tábuas do casco
-    g.fillStyle = '#dcac6c'; g.fillRect(8, 43, 40, 1.5); // borda iluminada
-    // castelo de popa (traseira elevada)
-    g.fillStyle = '#5a3a1a'; g.fillRect(36, 36, 14, 9);
-    g.fillStyle = '#8a6434'; g.fillRect(37, 37, 12, 7);
-    g.fillStyle = '#ffd24a'; g.fillRect(39, 39, 2, 2); g.fillRect(44, 39, 2, 2); // janelinhas
-    // convés
-    g.fillStyle = '#b08a50'; g.fillRect(10, 44, 26, 4);
-    // mastro principal + vela quadrada com emblema
-    g.fillStyle = '#3a2410'; g.fillRect(21, 4, 3, 42);
-    g.fillStyle = '#5a4224'; g.fillRect(21, 4, 1, 42);
-    g.fillStyle = '#f2ead2';
-    g.beginPath(); g.moveTo(8, 10); g.quadraticCurveTo(22.5, 16, 37, 10);
-    g.lineTo(37, 30); g.quadraticCurveTo(22.5, 37, 8, 30); g.closePath(); g.fill();
-    g.fillStyle = '#ddd2b2';
-    g.beginPath(); g.moveTo(8, 10); g.quadraticCurveTo(22.5, 16, 37, 10); g.lineTo(37, 14);
-    g.quadraticCurveTo(22.5, 20, 8, 14); g.closePath(); g.fill();
-    g.strokeStyle = '#c9bc96'; g.lineWidth = 1;
-    g.beginPath(); g.moveTo(8, 20); g.quadraticCurveTo(22.5, 26, 37, 20); g.stroke();
-    // emblema do peixe na vela
-    g.fillStyle = '#3a78c9';
-    g.beginPath(); g.ellipse(22, 23, 5, 3, 0, 0, 7); g.fill();
-    g.beginPath(); g.moveTo(26, 23); g.lineTo(29.5, 20.5); g.lineTo(29.5, 25.5); g.closePath(); g.fill();
-    // verga (trave da vela)
-    g.fillStyle = '#3a2410'; g.fillRect(6, 8, 33, 2);
-    // mastro de proa (menor) + bujarrona triangular
-    g.fillStyle = '#3a2410'; g.fillRect(9, 20, 2.4, 26);
-    g.fillStyle = '#f2ead2';
-    g.beginPath(); g.moveTo(10, 22); g.lineTo(10, 40); g.lineTo(1, 40); g.closePath(); g.fill();
-    g.fillStyle = '#ddd2b2';
-    g.beginPath(); g.moveTo(10, 22); g.lineTo(10, 28); g.lineTo(6, 32); g.closePath(); g.fill();
-    // cesto da gávea (vigia)
-    g.fillStyle = '#5a3a1a'; g.fillRect(19, 6, 7, 3.5);
-    g.fillStyle = '#8a6434'; g.fillRect(19.5, 6.5, 6, 2.5);
-    // bandeira vermelha no topo
-    g.fillStyle = '#e84040';
-    g.beginPath(); g.moveTo(22, 4); g.lineTo(22, 0.5); g.lineTo(31, 2.2); g.closePath(); g.fill();
-    // cordame
-    g.strokeStyle = 'rgba(60,40,20,.55)'; g.lineWidth = 0.8;
-    g.beginPath();
-    g.moveTo(22.5, 6); g.lineTo(46, 43);
-    g.moveTo(22.5, 6); g.lineTo(9, 42);
-    g.moveTo(10, 21); g.lineTo(4, 44);
-    g.stroke();
-    return c;
-  })(),
+// barcos direcionais: perfil (direita/esquerda espelhada), popa (subindo) e proa (descendo)
+const mkBoat = (w, h, fn) => { const c = mkCanvas(w, h); fn(c.getContext('2d')); return c; };
+const flipX = (s) => {
+  const c = mkCanvas(s.width, s.height);
+  const g = c.getContext('2d');
+  g.translate(s.width, 0); g.scale(-1, 1); g.drawImage(s, 0, 0);
+  return c;
 };
+
+const BOAT_SPRITES = (() => {
+  // ---------- BOTE A REMO ----------
+  const remoSide = mkBoat(52, 26, (g) => {
+    g.fillStyle = '#3a1e0c'; // contorno do casco
+    g.beginPath();
+    g.moveTo(3, 8); g.lineTo(40, 8); g.quadraticCurveTo(50, 9, 51, 14);
+    g.quadraticCurveTo(49, 20, 40, 23); g.lineTo(13, 23);
+    g.quadraticCurveTo(4, 20, 3, 13); g.closePath(); g.fill();
+    g.fillStyle = '#6a4a22';
+    g.beginPath();
+    g.moveTo(5, 9.5); g.lineTo(40, 9.5); g.quadraticCurveTo(48.5, 10.5, 49.5, 14);
+    g.quadraticCurveTo(47.5, 19, 39, 21.5); g.lineTo(14, 21.5);
+    g.quadraticCurveTo(6, 19, 5, 13.5); g.closePath(); g.fill();
+    g.save(); g.clip();
+    g.fillStyle = '#8a6434'; g.fillRect(3, 13, 48, 2); g.fillRect(3, 17, 48, 2); // tábuas
+    g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(3, 19.5, 48, 3); // sombra da quilha
+    g.restore();
+    g.fillStyle = '#42210f'; g.fillRect(7, 9.5, 32, 2.6); // interior escuro
+    g.fillStyle = '#b08a50'; g.fillRect(8, 10, 30, 1);
+    g.fillStyle = '#dcac6c'; g.fillRect(4, 7.4, 37, 1.8); // borda iluminada
+    g.fillStyle = '#c89858'; g.fillRect(23, 9, 3, 3.4); // banco
+    g.fillStyle = '#3a1e0c'; g.fillRect(19, 8.4, 2, 2.4); // forqueta
+    g.strokeStyle = '#5a4224'; g.lineWidth = 2; // remo na água
+    g.beginPath(); g.moveTo(20, 10); g.lineTo(11, 24); g.stroke();
+    g.fillStyle = '#8a6434';
+    g.beginPath(); g.ellipse(10.5, 24, 3, 1.6, -0.7, 0, 7); g.fill();
+  });
+  const remoUp = mkBoat(32, 46, (g) => {
+    g.fillStyle = '#3a1e0c'; // proa apontando pra cima
+    g.beginPath();
+    g.moveTo(16, 1.5); g.quadraticCurveTo(27, 9, 28, 20); g.lineTo(28, 36);
+    g.quadraticCurveTo(27, 44, 16, 44.5); g.quadraticCurveTo(5, 44, 4, 36);
+    g.lineTo(4, 20); g.quadraticCurveTo(5, 9, 16, 1.5); g.closePath(); g.fill();
+    g.fillStyle = '#6a4a22';
+    g.beginPath();
+    g.moveTo(16, 3.5); g.quadraticCurveTo(25.5, 10, 26.3, 20); g.lineTo(26.3, 36);
+    g.quadraticCurveTo(25.5, 42.4, 16, 42.8); g.quadraticCurveTo(6.5, 42.4, 5.7, 36);
+    g.lineTo(5.7, 20); g.quadraticCurveTo(6.5, 10, 16, 3.5); g.closePath(); g.fill();
+    g.fillStyle = '#b08a50'; // piso interno
+    g.beginPath();
+    g.moveTo(16, 8); g.quadraticCurveTo(22.5, 12, 23, 20); g.lineTo(23, 35);
+    g.quadraticCurveTo(22.5, 39.6, 16, 40); g.quadraticCurveTo(9.5, 39.6, 9, 35);
+    g.lineTo(9, 20); g.quadraticCurveTo(9.5, 12, 16, 8); g.closePath(); g.fill();
+    g.save(); g.clip();
+    g.fillStyle = '#8a6a3c';
+    for (let y = 12; y < 40; y += 4) g.fillRect(7, y, 18, 1.2);
+    g.restore();
+    g.fillStyle = '#8a6434'; // convés da proa
+    g.beginPath(); g.moveTo(16, 3.5); g.quadraticCurveTo(24, 9, 25, 15);
+    g.lineTo(7, 15); g.quadraticCurveTo(8, 9, 16, 3.5); g.closePath(); g.fill();
+    g.fillStyle = '#dcac6c'; g.fillRect(8, 14.2, 16, 1.4);
+    g.fillStyle = '#c89858'; g.fillRect(8.5, 25, 15, 4); // banco
+    g.fillStyle = '#a87840'; g.fillRect(8.5, 28, 15, 1);
+    g.fillStyle = '#5a4224'; // remos pros dois lados
+    g.fillRect(0, 25.5, 5.7, 2.2); g.fillRect(26.3, 25.5, 5.7, 2.2);
+    g.fillStyle = '#8a6434'; g.fillRect(0, 24.8, 2.6, 3.6); g.fillRect(29.4, 24.8, 2.6, 3.6);
+  });
+  const remoDown = mkBoat(32, 46, (g) => {
+    g.fillStyle = '#3a1e0c'; // proa apontando pra baixo
+    g.beginPath();
+    g.moveTo(16, 44.5); g.quadraticCurveTo(27, 37, 28, 26); g.lineTo(28, 10);
+    g.quadraticCurveTo(27, 2, 16, 1.5); g.quadraticCurveTo(5, 2, 4, 10);
+    g.lineTo(4, 26); g.quadraticCurveTo(5, 37, 16, 44.5); g.closePath(); g.fill();
+    g.fillStyle = '#6a4a22';
+    g.beginPath();
+    g.moveTo(16, 42.5); g.quadraticCurveTo(25.5, 36, 26.3, 26); g.lineTo(26.3, 10);
+    g.quadraticCurveTo(25.5, 3.6, 16, 3.2); g.quadraticCurveTo(6.5, 3.6, 5.7, 10);
+    g.lineTo(5.7, 26); g.quadraticCurveTo(6.5, 36, 16, 42.5); g.closePath(); g.fill();
+    g.fillStyle = '#b08a50'; // piso interno
+    g.beginPath();
+    g.moveTo(16, 38); g.quadraticCurveTo(22.5, 34, 23, 26); g.lineTo(23, 11);
+    g.quadraticCurveTo(22.5, 6.4, 16, 6); g.quadraticCurveTo(9.5, 6.4, 9, 11);
+    g.lineTo(9, 26); g.quadraticCurveTo(9.5, 34, 16, 38); g.closePath(); g.fill();
+    g.save(); g.clip();
+    g.fillStyle = '#8a6a3c';
+    for (let y = 8; y < 36; y += 4) g.fillRect(7, y, 18, 1.2);
+    g.restore();
+    g.fillStyle = '#8a6434'; // convés da proa (embaixo, perto de nós)
+    g.beginPath(); g.moveTo(16, 42.5); g.quadraticCurveTo(24, 37, 25, 31);
+    g.lineTo(7, 31); g.quadraticCurveTo(8, 37, 16, 42.5); g.closePath(); g.fill();
+    g.fillStyle = '#dcac6c'; g.fillRect(8, 30.4, 16, 1.4);
+    g.fillStyle = '#c89858'; g.fillRect(8.5, 17, 15, 4); // banco
+    g.fillStyle = '#a87840'; g.fillRect(8.5, 20, 15, 1);
+    g.fillStyle = '#5a4224';
+    g.fillRect(0, 18.5, 5.7, 2.2); g.fillRect(26.3, 18.5, 5.7, 2.2);
+    g.fillStyle = '#8a6434'; g.fillRect(0, 17.8, 2.6, 3.6); g.fillRect(29.4, 17.8, 2.6, 3.6);
+  });
+
+  // ---------- LANCHA ----------
+  const lanchaSide = mkBoat(60, 26, (g) => {
+    g.fillStyle = '#2d3640'; // contorno
+    g.beginPath();
+    g.moveTo(6, 8); g.lineTo(42, 7); g.quadraticCurveTo(55, 7.5, 58, 13);
+    g.quadraticCurveTo(55, 19, 46, 21); g.lineTo(14, 21);
+    g.quadraticCurveTo(6, 18, 6, 8); g.closePath(); g.fill();
+    g.fillStyle = '#e8ecf2';
+    g.beginPath();
+    g.moveTo(7.6, 9.4); g.lineTo(42, 8.5); g.quadraticCurveTo(53.6, 9, 56.2, 13);
+    g.quadraticCurveTo(53.6, 17.8, 45.4, 19.5); g.lineTo(14.8, 19.5);
+    g.quadraticCurveTo(7.6, 16.8, 7.6, 9.4); g.closePath(); g.fill();
+    g.save(); g.clip();
+    g.fillStyle = '#ffffff'; g.fillRect(4, 8.5, 54, 1.8); // brilho do costado
+    g.fillStyle = '#e84040'; g.fillRect(4, 13.2, 54, 3); // faixa esportiva
+    g.fillStyle = '#20486e'; g.fillRect(4, 17.4, 54, 3); // linha d'água
+    g.restore();
+    g.fillStyle = '#1c2836'; g.fillRect(22, 8, 15, 2.8); // cockpit
+    g.fillStyle = '#e84040'; g.fillRect(24, 8.6, 4, 1.6); // banco
+    g.fillStyle = '#9adcf0'; // para-brisa inclinado
+    g.beginPath(); g.moveTo(37, 8.5); g.lineTo(42, 3.2); g.lineTo(46.5, 3.2); g.lineTo(43.5, 8.5); g.closePath(); g.fill();
+    g.strokeStyle = '#5a636e'; g.lineWidth = 1; g.stroke();
+    g.fillStyle = '#2d3640'; g.fillRect(1, 8, 6, 10); // motor de popa
+    g.fillStyle = '#4a5560'; g.fillRect(1, 8, 6, 3);
+    g.fillStyle = '#8a97a4'; g.fillRect(2.4, 12, 3.2, 1.2);
+  });
+  const lanchaUp = mkBoat(34, 52, (g) => {
+    g.fillStyle = '#2d3640'; // proa em bico pra cima
+    g.beginPath();
+    g.moveTo(17, 1); g.quadraticCurveTo(29, 12, 30, 24); g.lineTo(30, 42);
+    g.quadraticCurveTo(30, 47.5, 24, 48); g.lineTo(10, 48);
+    g.quadraticCurveTo(4, 47.5, 4, 42); g.lineTo(4, 24);
+    g.quadraticCurveTo(5, 12, 17, 1); g.closePath(); g.fill();
+    g.fillStyle = '#e8ecf2';
+    g.beginPath();
+    g.moveTo(17, 3.4); g.quadraticCurveTo(27.6, 13, 28.4, 24); g.lineTo(28.4, 42);
+    g.quadraticCurveTo(28.3, 46.2, 23.6, 46.4); g.lineTo(10.4, 46.4);
+    g.quadraticCurveTo(5.7, 46.2, 5.6, 42); g.lineTo(5.6, 24);
+    g.quadraticCurveTo(6.4, 13, 17, 3.4); g.closePath(); g.fill();
+    g.fillStyle = '#e84040'; g.fillRect(5.6, 24, 2.4, 20); g.fillRect(26, 24, 2.4, 20); // faixas laterais
+    g.fillStyle = '#c9d2dc'; // convés da proa
+    g.beginPath(); g.moveTo(17, 3.4); g.quadraticCurveTo(26, 12, 27.5, 20);
+    g.lineTo(6.5, 20); g.quadraticCurveTo(8, 12, 17, 3.4); g.closePath(); g.fill();
+    g.fillStyle = '#f6f8fb'; g.fillRect(15.4, 5, 3.2, 15); // friso central
+    g.fillStyle = '#9adcf0'; // para-brisa envolvente
+    g.beginPath(); g.moveTo(6.5, 20); g.lineTo(27.5, 20); g.lineTo(25.6, 24.5); g.lineTo(8.4, 24.5); g.closePath(); g.fill();
+    g.strokeStyle = '#5a636e'; g.lineWidth = 1; g.stroke();
+    g.fillStyle = '#1c2836'; g.fillRect(8.4, 25.5, 17.2, 15); // cockpit
+    g.fillStyle = '#e84040'; g.fillRect(10.6, 28, 5.4, 4.4); g.fillRect(18, 28, 5.4, 4.4); // bancos
+    g.fillStyle = 'rgba(255,255,255,.25)'; g.fillRect(10.6, 28, 5.4, 1.2); g.fillRect(18, 28, 5.4, 1.2);
+    g.fillStyle = '#c9d2dc'; g.fillRect(8.4, 40.5, 17.2, 5); // popa
+    g.fillStyle = '#2d3640'; g.fillRect(13, 45.5, 8, 6.5); // motor
+    g.fillStyle = '#4a5560'; g.fillRect(13, 45.5, 8, 2.2);
+  });
+  const lanchaDown = mkBoat(34, 52, (g) => {
+    g.fillStyle = '#2d3640'; // proa em bico pra baixo, motor em cima
+    g.beginPath();
+    g.moveTo(17, 51); g.quadraticCurveTo(29, 40, 30, 28); g.lineTo(30, 10);
+    g.quadraticCurveTo(30, 4.5, 24, 4); g.lineTo(10, 4);
+    g.quadraticCurveTo(4, 4.5, 4, 10); g.lineTo(4, 28);
+    g.quadraticCurveTo(5, 40, 17, 51); g.closePath(); g.fill();
+    g.fillStyle = '#e8ecf2';
+    g.beginPath();
+    g.moveTo(17, 48.6); g.quadraticCurveTo(27.6, 39, 28.4, 28); g.lineTo(28.4, 10);
+    g.quadraticCurveTo(28.3, 5.8, 23.6, 5.6); g.lineTo(10.4, 5.6);
+    g.quadraticCurveTo(5.7, 5.8, 5.6, 10); g.lineTo(5.6, 28);
+    g.quadraticCurveTo(6.4, 39, 17, 48.6); g.closePath(); g.fill();
+    g.fillStyle = '#e84040'; g.fillRect(5.6, 8, 2.4, 20); g.fillRect(26, 8, 2.4, 20);
+    g.fillStyle = '#c9d2dc'; // convés da proa (embaixo)
+    g.beginPath(); g.moveTo(17, 48.6); g.quadraticCurveTo(26, 40, 27.5, 32);
+    g.lineTo(6.5, 32); g.quadraticCurveTo(8, 40, 17, 48.6); g.closePath(); g.fill();
+    g.fillStyle = '#f6f8fb'; g.fillRect(15.4, 32, 3.2, 15);
+    g.fillStyle = '#9adcf0'; // para-brisa (na frente do cockpit = mais perto da proa)
+    g.beginPath(); g.moveTo(6.5, 32); g.lineTo(27.5, 32); g.lineTo(25.6, 27.5); g.lineTo(8.4, 27.5); g.closePath(); g.fill();
+    g.strokeStyle = '#5a636e'; g.lineWidth = 1; g.stroke();
+    g.fillStyle = '#1c2836'; g.fillRect(8.4, 11.5, 17.2, 15); // cockpit
+    g.fillStyle = '#e84040'; g.fillRect(10.6, 19.6, 5.4, 4.4); g.fillRect(18, 19.6, 5.4, 4.4);
+    g.fillStyle = 'rgba(255,255,255,.25)'; g.fillRect(10.6, 19.6, 5.4, 1.2); g.fillRect(18, 19.6, 5.4, 1.2);
+    g.fillStyle = '#c9d2dc'; g.fillRect(8.4, 6.5, 17.2, 5); // popa (em cima)
+    g.fillStyle = '#2d3640'; g.fillRect(13, 0, 8, 6.5); // motor
+    g.fillStyle = '#4a5560'; g.fillRect(13, 0, 8, 2.2);
+  });
+
+  // ---------- CARAVELA ----------
+  const caravelaSide = mkBoat(84, 68, (g) => {
+    // mastros e vergas (atrás das velas)
+    g.fillStyle = '#2a1608'; g.fillRect(39, 4, 3, 44); // mastro principal
+    g.fillStyle = '#5a4224'; g.fillRect(39, 4, 1.2, 44);
+    g.fillStyle = '#2a1608'; g.fillRect(60, 14, 2.6, 32); // mastro de proa
+    g.fillStyle = '#5a4224'; g.fillRect(60, 14, 1, 32);
+    g.fillStyle = '#2a1608'; g.fillRect(26, 8, 30, 2.2); g.fillRect(50, 17, 22, 2); // vergas
+    // vela principal bojuda (vento a favor)
+    g.fillStyle = '#f2ead2';
+    g.beginPath(); g.moveTo(27, 11); g.lineTo(55, 11);
+    g.quadraticCurveTo(62, 22, 55, 34); g.lineTo(27, 34);
+    g.quadraticCurveTo(34, 22, 27, 11); g.closePath(); g.fill();
+    g.fillStyle = '#ddd2b2';
+    g.beginPath(); g.moveTo(27, 11); g.quadraticCurveTo(34, 22, 27, 34);
+    g.lineTo(33, 34); g.quadraticCurveTo(40, 22, 33, 11); g.closePath(); g.fill();
+    g.strokeStyle = '#c9bc96'; g.lineWidth = 1; // costuras
+    g.beginPath(); g.moveTo(29, 19); g.quadraticCurveTo(45, 21, 57, 19);
+    g.moveTo(29, 27); g.quadraticCurveTo(45, 29, 57, 27); g.stroke();
+    g.fillStyle = '#3a78c9'; // emblema do peixe
+    g.beginPath(); g.ellipse(45, 22.5, 5.6, 3.4, 0, 0, 7); g.fill();
+    g.beginPath(); g.moveTo(50, 22.5); g.lineTo(54, 19.8); g.lineTo(54, 25.2); g.closePath(); g.fill();
+    // vela de proa
+    g.fillStyle = '#f2ead2';
+    g.beginPath(); g.moveTo(51, 20); g.lineTo(71, 20);
+    g.quadraticCurveTo(76, 28, 71, 36); g.lineTo(51, 36);
+    g.quadraticCurveTo(56, 28, 51, 20); g.closePath(); g.fill();
+    g.fillStyle = '#ddd2b2';
+    g.beginPath(); g.moveTo(51, 20); g.quadraticCurveTo(56, 28, 51, 36);
+    g.lineTo(55, 36); g.quadraticCurveTo(60, 28, 55, 20); g.closePath(); g.fill();
+    // bujarrona triangular
+    g.fillStyle = '#e9e0c4';
+    g.beginPath(); g.moveTo(64, 23); g.lineTo(79, 40); g.lineTo(64, 40); g.closePath(); g.fill();
+    // casco (na frente das velas)
+    g.fillStyle = '#2a1608';
+    g.beginPath();
+    g.moveTo(5, 37); g.lineTo(24, 37); g.lineTo(25, 44);
+    g.lineTo(66, 44); g.quadraticCurveTo(74, 42, 77, 46);
+    g.quadraticCurveTo(74, 56, 62, 62); g.lineTo(26, 63);
+    g.quadraticCurveTo(10, 58, 6, 48); g.closePath(); g.fill();
+    g.fillStyle = '#6a4a22';
+    g.beginPath();
+    g.moveTo(7, 38.6); g.lineTo(22.6, 38.6); g.lineTo(23.6, 45.6);
+    g.lineTo(65.4, 45.6); g.quadraticCurveTo(72.6, 43.8, 75.2, 47);
+    g.quadraticCurveTo(72.4, 55.2, 61, 60.4); g.lineTo(27, 61.4);
+    g.quadraticCurveTo(11.6, 56.6, 7.6, 47.6); g.closePath(); g.fill();
+    g.save(); g.clip();
+    g.fillStyle = '#8a6434'; g.fillRect(4, 47, 78, 3); g.fillRect(4, 52.6, 78, 2.4); // tábuas
+    g.fillStyle = 'rgba(0,0,0,.22)'; g.fillRect(4, 57, 78, 7); // sombra da quilha
+    g.fillStyle = '#dcac6c'; g.fillRect(4, 44.4, 74, 1.6); // borda do convés
+    g.restore();
+    // castelo de popa
+    g.fillStyle = '#8a6434'; g.fillRect(7, 38.6, 15.5, 6.5);
+    g.fillStyle = '#5a3a1a'; g.fillRect(7, 43.2, 15.5, 1.9);
+    g.fillStyle = '#ffd24a'; g.fillRect(9, 40, 2.2, 2.2); g.fillRect(13.8, 40, 2.2, 2.2); g.fillRect(18.6, 40, 2.2, 2.2);
+    // gurupés
+    g.fillStyle = '#2a1608';
+    g.beginPath(); g.moveTo(70, 46); g.lineTo(83, 39.4); g.lineTo(84, 41.4); g.lineTo(71.2, 48); g.closePath(); g.fill();
+    // cordame
+    g.strokeStyle = 'rgba(50,32,16,.6)'; g.lineWidth = 0.9;
+    g.beginPath();
+    g.moveTo(40.5, 5); g.lineTo(10, 38); g.moveTo(40.5, 5); g.lineTo(66, 44);
+    g.moveTo(61, 15); g.lineTo(82, 40);
+    g.stroke();
+    // cesto da gávea + bandeira
+    g.fillStyle = '#5a3a1a'; g.fillRect(36.6, 6.5, 8, 3.6);
+    g.fillStyle = '#8a6434'; g.fillRect(37.2, 7, 6.8, 2.6);
+    g.fillStyle = '#e84040';
+    g.beginPath(); g.moveTo(40.5, 4.5); g.lineTo(40.5, 0.5); g.lineTo(50, 2.4); g.closePath(); g.fill();
+  });
+  const caravelaUp = mkBoat(60, 72, (g) => {
+    // vela do mastro de proa (mais longe, no topo)
+    g.fillStyle = '#2a1608'; g.fillRect(29.2, 0.5, 1.8, 8);
+    g.fillRect(19, 2, 22, 1.8);
+    g.fillStyle = '#e6dbbc';
+    g.beginPath(); g.moveTo(20, 4.4); g.quadraticCurveTo(30, 8, 40, 4.4);
+    g.lineTo(40, 10); g.quadraticCurveTo(30, 13.6, 20, 10); g.closePath(); g.fill();
+    // mastro principal + verga
+    g.fillStyle = '#2a1608'; g.fillRect(28.4, 4, 3.2, 44);
+    g.fillStyle = '#5a4224'; g.fillRect(28.4, 4, 1.2, 44);
+    g.fillStyle = '#2a1608'; g.fillRect(9, 8.6, 42, 2.4);
+    // vela principal vista de trás (tom mais apagado)
+    g.fillStyle = '#e6dbbc';
+    g.beginPath(); g.moveTo(11, 12); g.quadraticCurveTo(30, 18, 49, 12);
+    g.lineTo(49, 34); g.quadraticCurveTo(30, 41, 11, 34); g.closePath(); g.fill();
+    g.fillStyle = '#d3c6a2';
+    g.beginPath(); g.moveTo(11, 12); g.quadraticCurveTo(30, 18, 49, 12);
+    g.lineTo(49, 17); g.quadraticCurveTo(30, 23, 11, 17); g.closePath(); g.fill();
+    g.strokeStyle = '#c0b28e'; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(11, 24); g.quadraticCurveTo(30, 30, 49, 24); g.stroke();
+    // casco com popa virada pra gente
+    g.fillStyle = '#2a1608';
+    g.beginPath(); g.moveTo(5, 50); g.quadraticCurveTo(7, 66, 30, 67.5);
+    g.quadraticCurveTo(53, 66, 55, 50); g.lineTo(51, 46); g.lineTo(9, 46); g.closePath(); g.fill();
+    g.fillStyle = '#6a4a22';
+    g.beginPath(); g.moveTo(7, 50); g.quadraticCurveTo(9, 63.6, 30, 65.4);
+    g.quadraticCurveTo(51, 63.6, 53, 50); g.lineTo(49.4, 47.4); g.lineTo(10.6, 47.4); g.closePath(); g.fill();
+    g.fillStyle = '#8a6434'; g.fillRect(9, 48.6, 42, 5.4);
+    g.fillStyle = '#77522a'; g.fillRect(8, 54.6, 44, 1.8); g.fillRect(10, 59, 40, 1.6);
+    g.fillStyle = '#dcac6c'; g.fillRect(9, 47.6, 42, 1.6);
+    // espelho de popa com janelas da cabine e leme
+    g.fillStyle = '#5a3a1a'; g.fillRect(17, 50.5, 26, 10);
+    g.fillStyle = '#8a6434'; g.fillRect(18.2, 51.6, 23.6, 7.8);
+    g.fillStyle = '#ffd24a'; g.fillRect(21, 54, 2.4, 2.6); g.fillRect(28.8, 54, 2.4, 2.6); g.fillRect(36.6, 54, 2.4, 2.6);
+    g.fillStyle = '#3a2410'; g.fillRect(28.6, 60.5, 2.8, 5.5);
+    // bandeira
+    g.fillStyle = '#e84040';
+    g.beginPath(); g.moveTo(31, 4.6); g.lineTo(31, 1); g.lineTo(40, 2.8); g.closePath(); g.fill();
+    // cordame
+    g.strokeStyle = 'rgba(50,32,16,.55)'; g.lineWidth = 0.9;
+    g.beginPath(); g.moveTo(30, 6); g.lineTo(8, 48); g.moveTo(30, 6); g.lineTo(52, 48); g.stroke();
+  });
+  const caravelaDown = mkBoat(60, 72, (g) => {
+    // mastro principal + verga (mais longe, em cima)
+    g.fillStyle = '#2a1608'; g.fillRect(28.4, 2, 3.2, 40);
+    g.fillRect(6, 5, 48, 2.6);
+    // vela principal de frente, bem bojuda
+    g.fillStyle = '#f6efd8';
+    g.beginPath(); g.moveTo(8, 8.6); g.lineTo(52, 8.6);
+    g.quadraticCurveTo(56, 22, 52, 35); g.quadraticCurveTo(30, 42, 8, 35);
+    g.quadraticCurveTo(4, 22, 8, 8.6); g.closePath(); g.fill();
+    g.fillStyle = '#ddd2b2'; // sombras nas bordas
+    g.beginPath(); g.moveTo(8, 8.6); g.quadraticCurveTo(4, 22, 8, 35);
+    g.lineTo(13, 36.4); g.quadraticCurveTo(9, 22, 13, 8.6); g.closePath(); g.fill();
+    g.beginPath(); g.moveTo(52, 8.6); g.quadraticCurveTo(56, 22, 52, 35);
+    g.lineTo(47, 36.4); g.quadraticCurveTo(51, 22, 47, 8.6); g.closePath(); g.fill();
+    g.strokeStyle = '#d8cca8'; g.lineWidth = 1; // costuras
+    g.beginPath(); g.moveTo(10, 17); g.quadraticCurveTo(30, 21, 50, 17);
+    g.moveTo(10, 26); g.quadraticCurveTo(30, 30, 50, 26); g.stroke();
+    g.fillStyle = '#3a78c9'; // emblema grande do peixe
+    g.beginPath(); g.ellipse(28, 22, 7.6, 4.4, 0, 0, 7); g.fill();
+    g.beginPath(); g.moveTo(35, 22); g.lineTo(40.5, 18.4); g.lineTo(40.5, 25.6); g.closePath(); g.fill();
+    g.fillStyle = '#fff'; g.fillRect(24, 20.4, 1.6, 1.6); // olho
+    // vela de proa menor (mais perto, sobre o casco)
+    g.fillStyle = '#2a1608'; g.fillRect(28.8, 30, 2.4, 14);
+    g.fillRect(13, 36, 34, 2);
+    g.fillStyle = '#f2ead2';
+    g.beginPath(); g.moveTo(14, 38.6); g.lineTo(46, 38.6);
+    g.quadraticCurveTo(48.4, 44, 46, 49.4); g.quadraticCurveTo(30, 53, 14, 49.4);
+    g.quadraticCurveTo(11.6, 44, 14, 38.6); g.closePath(); g.fill();
+    // casco em V com a proa vindo na nossa direção
+    g.fillStyle = '#2a1608';
+    g.beginPath(); g.moveTo(7, 48); g.lineTo(53, 48); g.quadraticCurveTo(55, 57, 43, 64);
+    g.quadraticCurveTo(36, 68, 30, 70); g.quadraticCurveTo(24, 68, 17, 64);
+    g.quadraticCurveTo(5, 57, 7, 48); g.closePath(); g.fill();
+    g.fillStyle = '#6a4a22';
+    g.beginPath(); g.moveTo(9, 49.6); g.lineTo(51, 49.6); g.quadraticCurveTo(52.6, 56.6, 42, 62.6);
+    g.quadraticCurveTo(35.4, 66.4, 30, 68.2); g.quadraticCurveTo(24.6, 66.4, 18, 62.6);
+    g.quadraticCurveTo(7.4, 56.6, 9, 49.6); g.closePath(); g.fill();
+    g.save(); g.clip();
+    g.fillStyle = '#8a6434'; g.fillRect(6, 53, 48, 2.4); g.fillRect(8, 58, 44, 2); // tábuas
+    g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(6, 62, 48, 8);
+    g.restore();
+    g.fillStyle = '#dcac6c'; g.fillRect(9, 48.4, 42, 1.6); // borda do convés
+    g.fillStyle = '#b08a50'; g.fillRect(29, 51, 2, 17); // roda de proa
+    // gurupés apontando pra baixo
+    g.fillStyle = '#2a1608'; g.fillRect(28.6, 58, 2.8, 13.5);
+    g.fillStyle = '#5a4224'; g.fillRect(28.6, 58, 1, 13.5);
+  });
+
+  return {
+    remo:    { right: remoSide, left: flipX(remoSide), up: remoUp, down: remoDown },
+    lancha:  { right: lanchaSide, left: flipX(lanchaSide), up: lanchaUp, down: lanchaDown },
+    veleiro: { right: caravelaSide, left: flipX(caravelaSide), up: caravelaUp, down: caravelaDown },
+  };
+})();
 
 // x,y = centro dos pés; boat = false | 'remo' | 'lancha' | 'veleiro'
 function drawChar(x, y, dir, name, moving, time, boat, fishing, npcColor, hue) {
   x = Math.round(x); y = Math.round(y);
   if (boat) {
-    const spr = BOAT_SPRITES[boat] || BOAT_SPRITES.remo;
+    const set = BOAT_SPRITES[boat] || BOAT_SPRITES.remo;
+    const spr = set[dir] || set.right;
     ctx.fillStyle = 'rgba(10,30,50,.25)';
-    ctx.beginPath(); ctx.ellipse(x, y + 5, 16, 5, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x, y + 5, Math.min(spr.width * 0.44, 30), 5.5, 0, 0, 7); ctx.fill();
     const bobY = Math.sin(time * 2 + x * 0.1) * 1;
-    ctx.drawImage(spr, x - spr.width / 2, y + 9 - spr.height + bobY);
+    ctx.drawImage(spr, Math.round(x - spr.width / 2), Math.round(y + 9 - spr.height + bobY));
     ctx.drawImage(charSprite(name, dir, 0, fishing, npcColor, hue), x - 12, y - 31 + bobY);
     return;
   }
@@ -2377,6 +2728,14 @@ const mmBase = mkCanvas(W, H);
     const c = colors[MAP[i]] || [0, 0, 0];
     img.data[i * 4] = c[0]; img.data[i * 4 + 1] = c[1]; img.data[i * 4 + 2] = c[2]; img.data[i * 4 + 3] = 255;
   }
+  // salas internas (farol/grutas) não existem no minimapa — vira mar
+  const deep = colors[T.DEEP];
+  for (const r of HIDDEN_ROOMS) {
+    for (let y = r.y0; y <= r.y1; y++) for (let x = r.x0; x <= r.x1; x++) {
+      const i = y * W + x;
+      img.data[i * 4] = deep[0]; img.data[i * 4 + 1] = deep[1]; img.data[i * 4 + 2] = deep[2];
+    }
+  }
   g.putImageData(img, 0, 0);
 }
 function drawMinimap(time) {
@@ -2392,14 +2751,15 @@ function drawMinimap(time) {
     mmctx.fillStyle = 'rgba(255,210,74,.85)';
     mmctx.fillRect(z.x * sx - 0.5, z.y * sy - 0.5, 1.5, 1.5);
   }
-  // outros jogadores: bolinha verde-menta
+  // outros jogadores: bolinha verde-menta (escondidos se estiverem numa gruta)
   for (const p of others.values()) {
+    if (roomAtPx(p.x, p.y)) continue;
     mmctx.fillStyle = '#0a1420';
     mmctx.fillRect(p.x * sx - 2, p.y * sy - 2, 4, 4);
     mmctx.fillStyle = '#7affc8';
     mmctx.fillRect(p.x * sx - 1.5, p.y * sy - 1.5, 3, 3);
   }
-  if (Math.floor(time * 3) % 2 === 0) {
+  if (!myRoom && Math.floor(time * 3) % 2 === 0) {
     mmctx.fillStyle = '#ff4040';
     mmctx.fillRect(me.x * sx - 1.5, me.y * sy - 1.5, 3, 3);
   }
@@ -2669,6 +3029,7 @@ function frame_(now) {
   ctx.imageSmoothingEnabled = false;
 
   // tiles
+  myRoom = roomAtPx(me.x, me.y);
   const frame = Math.floor(time * 2.2) % 4;
   const tx0 = Math.floor(camX / TILE), ty0 = Math.floor(camY / TILE);
   for (let ty = ty0; ty <= ty0 + Math.ceil(VH / TILE); ty++) {
@@ -2758,6 +3119,8 @@ function frame_(now) {
   if (profile) {
     // drops
     for (const d of drops.values()) {
+      const dr = roomAtPx(d.x, d.y);
+      if (dr && dr !== myRoom) continue; // tesouro em gruta só aparece pra quem está dentro
       const r = catalog.rarities[d.fish.rarity];
       const bob = Math.sin(time * 3 + d.id) * 1.5;
       drawShadow(d.x, d.y + 4, 6, 2);
@@ -2773,11 +3136,17 @@ function frame_(now) {
       ents.push({ kind: 'decor', y: d.y, d });
     }
     for (const n of NPCS) {
+      const nr = roomAtTile(n.tx, n.ty);
+      if (nr && nr !== myRoom) continue; // Guardião do Farol invisível de fora
       const np = npcPos(n);
       ents.push({ kind: 'npc', y: np.y, n, np });
     }
     for (const c of critters) ents.push({ kind: 'critter', y: c.y, c });
-    for (const p of others.values()) ents.push({ kind: 'player', y: p.y, p });
+    for (const p of others.values()) {
+      const pr2 = roomAtPx(p.x, p.y);
+      if (pr2 && pr2 !== myRoom) continue;
+      ents.push({ kind: 'player', y: p.y, p });
+    }
     ents.push({ kind: 'me', y: me.y });
     ents.sort((a, b) => a.y - b.y);
 

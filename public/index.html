@@ -35,10 +35,7 @@
     border: 1px solid #3a5a7a; animation: fadein .3s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
   @keyframes fadein { from { opacity: 0; transform: translateY(-8px); } }
 
-  #hint { bottom: 8px; left: 50%; transform: translateX(-50%); font-size: 11.5px; color: #bcd;
-    background: rgba(12,20,30,.72); padding: 4px 12px; border-radius: 8px; position: absolute; white-space: nowrap; }
-
-  #toast { top: 30%; left: 50%; transform: translate(-50%, -50%); font-size: 16px; font-weight: 600;
+  #toast { bottom: 17%; left: 50%; transform: translateX(-50%); font-size: 16px; font-weight: 600;
     text-align: center; padding: 12px 24px; display: none; position: absolute; border-width: 2px; z-index: 8; }
 
   #minimap { position: absolute; top: 10px; right: 10px; border: 1px solid #3a5a7a; border-radius: 8px;
@@ -117,7 +114,7 @@
   #dialog { bottom: 60px; left: 50%; transform: translateX(-50%); width: 480px; max-width: 86%;
     display: none; z-index: 6; border-width: 2px; }
   #dialog .npc { color: #ffd24a; font-weight: 700; margin-bottom: 4px; }
-  #dialog .txt { font-size: 13.5px; white-space: pre-line; }
+  #dialog .txt { font-size: 13.5px; white-space: pre-line; text-align: justify; }
   #dialog .close { color: #9ab; font-size: 11px; margin-top: 6px; }
 
   #login { position: absolute; inset: 0; background: rgba(6,10,16,.94); display: flex;
@@ -134,7 +131,6 @@
   /* ---------- controles de toque (só aparecem em celular/tablet) ---------- */
   #touchui { display: none; }
   body.touch #touchui { display: block; }
-  body.touch #hint { display: none; }
   body.touch #chatbox { display: none; }
   body.touch #chatbox.open { display: block; }
   #wrap, canvas { touch-action: none; }
@@ -178,7 +174,6 @@
   <div id="zonelabel" class="panel"></div>
   <div id="announces"></div>
   <div id="toast" class="panel"></div>
-  <div id="hint">WASD mover · SHIFT correr · ESPAÇO pescar · E interagir · I balde · C coleção · Q missões · B isca · ENTER chat · 🎮 controle suportado</div>
 
   <div id="chatbox" class="panel">
     <div id="chatlog"></div>
@@ -191,7 +186,7 @@
     <div class="tabs" id="invtabs"></div>
     <div id="invtab-bucket">
       <div id="invlist"></div>
-      <div style="margin-top:8px; font-size:12.5px;">Total: <b class="coins" id="invtotal">0 🪙</b> — venda com o Zé na vila. "Soltar" deixa o peixe no chão pra um amigo pegar!</div>
+      <div style="margin-top:8px; font-size:12.5px;">Total: <b class="coins" id="invtotal">0 🪙</b> — venda com Teodoro na vila. "Soltar" deixa o peixe no chão pra um amigo pegar!</div>
     </div>
     <div id="invtab-gear" style="display:none"></div>
   </div>
@@ -213,7 +208,7 @@
 
   <div id="shop" class="panel modal">
     <div class="xclose">✕</div>
-    <h2 id="shoptitle">🏪 Barraca do Zé do Peixe</h2>
+    <h2 id="shoptitle">🏪 Peixe & Cia — Teodoro</h2>
     <div class="tabs" id="shoptabs"></div>
     <div class="shopitem" id="shopsellrow">
       <div>Vender todos os peixes <div class="desc" id="selldesc">balde vazio</div></div>
@@ -236,6 +231,13 @@
   <div id="settings" class="panel modal">
     <div class="xclose">✕</div>
     <h2>⚙️ Configurações</h2>
+    <h3>⌨️ Controles</h3>
+    <div id="keylist" style="font-size:12px"></div>
+    <button class="btn small" id="key-reset" style="margin-top:4px">Restaurar teclas padrão</button>
+    <div style="font-size:11px;color:#9ab;margin:6px 0 10px">
+      SHIFT corre · ENTER abre o chat · ESC fecha janelas<br>
+      🎮 Controle (gamepad) suportado: analógico/D-pad move, A pesca, B interage, RT turbo
+    </div>
     <div style="font-size:12.5px;margin:4px 0">👕 Cor da roupa:</div>
     <div id="colorrow"></div>
     <button class="btn" id="set-sound" style="width:100%">🔊 Som: ligado</button>
@@ -272,7 +274,7 @@
     </div>
   </div>
 </div>
-<script src="world.js?v=4"></script>
-<script src="game.js?v=4"></script>
+<script src="world.js?v=5"></script>
+<script src="game.js?v=5"></script>
 </body>
 </html>

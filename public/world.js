@@ -32,11 +32,11 @@
   };
 
   const NPCS = [
-    { id: 'ze',       name: 'Zé do Peixe',      role: 'shop',     island: 'vila', tx: 204, ty: 297 },
-    { id: 'nino',     name: 'Mestre Nino',      role: 'boatshop', island: 'vila', tx: 210, ty: 302 },
-    { id: 'bia',      name: 'Dona Bia',         role: 'quest', island: 'vila',    tx: 194, ty: 304 },
-    { id: 'pedro',    name: 'Velho Pedro',      role: 'quest', island: 'vila',    tx: 246, ty: 304 },
-    { id: 'ilo',      name: 'Faroleiro Ilo',    role: 'quest', island: 'farol',   tx: 397, ty: 304 },
+    { id: 'ze',       name: 'Teodoro',          role: 'shop',     island: 'vila', tx: 204, ty: 297 },
+    { id: 'nino',     name: 'Capitão Nereu',    role: 'boatshop', island: 'vila', tx: 210, ty: 302 },
+    { id: 'bia',      name: 'Beatriz',          role: 'quest', island: 'vila',    tx: 194, ty: 304 },
+    { id: 'pedro',    name: 'Bartolomeu',       role: 'quest', island: 'vila',    tx: 246, ty: 304 },
+    { id: 'ilo',      name: 'Ismael',           role: 'quest', island: 'farol',   tx: 397, ty: 304 },
     { id: 'nanuk',    name: 'Nanuk',            role: 'quest', island: 'gelo',    tx: 140, ty: 111 },
     { id: 'kira',     name: 'Kira',             role: 'quest', island: 'gelo',    tx: 150, ty: 121 },
     { id: 'omar',     name: 'Sheik Omar',       role: 'quest', island: 'deserto', tx: 620, ty: 121 },
@@ -56,7 +56,7 @@
 
   // grutas secretas: entrada escondida na ilha → sala no canto do mapa com tesouros
   const CAVES = [
-    { id: 'gvila',    name: 'Gruta da Mata',    entrance: { tx: 183, ty: 272 }, room: { x0: 30, y0: 8, x1: 42, y1: 17, doorTx: 36, doorTy: 17, spawnTx: 36, spawnTy: 15 } },
+    { id: 'gvila',    name: 'Gruta da Mata',    entrance: { tx: 230, ty: 240 }, room: { x0: 30, y0: 8, x1: 42, y1: 17, doorTx: 36, doorTy: 17, spawnTx: 36, spawnTy: 15 } },
     { id: 'gdeserto', name: 'Caverna das Dunas', entrance: { tx: 604, ty: 103 }, room: { x0: 50, y0: 8, x1: 62, y1: 17, doorTx: 56, doorTy: 17, spawnTx: 56, spawnTy: 15 } },
     { id: 'gvulcao',  name: 'Toca de Magma',    entrance: { tx: 388, ty: 505 }, room: { x0: 70, y0: 8, x1: 82, y1: 17, doorTx: 76, doorTy: 17, spawnTx: 76, spawnTy: 15 } },
   ];

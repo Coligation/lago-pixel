@@ -29,7 +29,7 @@ Pra jogar pela internet: `cloudflared tunnel --url http://localhost:3000` (grát
 
 ## O arquipélago
 
-- **Vila do Cais** — spawn, loja do Zé, missões da Dona Bia
+- **Vila do Cais** — spawn, loja do Teodoro, missões da Beatriz
 - **Geleira Branca** (NO) — peixes árticos, missões do Nanuk
 - **Duna Seca** (NE) — oásis no deserto, missões do Sheik Omar
 - **Costa Dourada** (SE) — savana, missões do Adama
@@ -37,7 +37,7 @@ Pra jogar pela internet: `cloudflared tunnel --url http://localhost:3000` (grát
 - **Alto-Mar** — entre as ilhas, só de barco, peixes grandes
 
 Cada zona tem espécies próprias (comuns → lendárias). Barcos, varas, linhas e
-iscas na loja do Zé; progressão por nível/XP.
+iscas na loja do Teodoro, barcos no estaleiro do Capitão Nereu; progressão por nível/XP.
 
 ## Arquitetura
 
