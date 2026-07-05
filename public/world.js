@@ -32,10 +32,10 @@
   };
 
   const NPCS = [
-    { id: 'ze',       name: 'Teodoro',          role: 'shop',     island: 'vila', tx: 207, ty: 296 },
-    { id: 'nino',     name: 'Capitão Nereu',    role: 'boatshop', island: 'vila', tx: 212, ty: 301 },
-    { id: 'bia',      name: 'Beatriz',          role: 'quest', island: 'vila',    tx: 194, ty: 297 },
-    { id: 'pedro',    name: 'Bartolomeu',       role: 'quest', island: 'vila',    tx: 216, ty: 297 },
+    { id: 'ze',       name: 'Teodoro',          role: 'shop',     island: 'vila', tx: 204, ty: 297 },
+    { id: 'nino',     name: 'Capitão Nereu',    role: 'boatshop', island: 'vila', tx: 210, ty: 302 },
+    { id: 'bia',      name: 'Beatriz',          role: 'quest', island: 'vila',    tx: 194, ty: 304 },
+    { id: 'pedro',    name: 'Bartolomeu',       role: 'quest', island: 'vila',    tx: 246, ty: 304 },
     { id: 'ilo',      name: 'Ismael',           role: 'quest', island: 'farol',   tx: 397, ty: 304 },
     { id: 'nanuk',    name: 'Nanuk',            role: 'quest', island: 'gelo',    tx: 140, ty: 111 },
     { id: 'kira',     name: 'Kira',             role: 'quest', island: 'gelo',    tx: 150, ty: 121 },
@@ -166,7 +166,7 @@
       if (x * x + y * y <= 21) set(vul.cx + x, vul.cy + y - 10, T.LAVA);
     }
 
-    // 4) vila: praça central com jardim, mini-praças em frente das casas, ruas ligando tudo
+    // 4) vila: praça, casas, ruas e cais
     const house = (hx, hy) => {
       for (let x = 0; x < 5; x++) { set(hx + x, hy, T.ROOF); set(hx + x, hy + 1, T.ROOF); }
       for (let x = 0; x < 5; x++) { set(hx + x, hy + 2, T.WALL); set(hx + x, hy + 3, T.WALL); }
@@ -174,53 +174,14 @@
     };
     const vila = ISLANDS.find(i => i.id === 'vila');
     const vx = vila.cx, vy = vila.cy;
-    // gramado limpo pra depois desenhar tudo por cima
     for (let y = vy - 12; y <= vy + 10; y++) for (let x = vx - 17; x <= vx + 17; x++) {
       if (!isWater(at(x, y))) set(x, y, T.GRASS);
     }
-    house(vx - 14, vy - 10); house(vx - 3, vy - 10); house(vx + 8, vy - 10);   // Casa1..3 ao norte
-    house(vx - 14, vy + 2); house(vx + 8, vy + 6);                              // Casa4 SW, Casa5 SE
-
-    const struct = (x, y) => { const t = at(x, y); return t === T.WALL || t === T.ROOF || t === T.DOOR || t === T.KIOSK || isWater(t); };
-    const paint = (x, y, t) => { if (!struct(x, y)) set(x, y, t); };
-    const paintSand = (x, y) => { if (at(x, y) === T.GRASS) set(x, y, T.SAND); };
-    const paintFlower = (x, y) => { if (at(x, y) === T.GRASS) set(x, y, T.FLOWER); };
-
-    // avenida horizontal (rua principal) e vertical (leva ao cais)
-    for (let x = vx - 12; x <= vx + 12; x++) paint(x, vy - 3, T.PATH);
-    for (let y = vy - 4; y <= vy + 9; y++) paint(vx, y, T.PATH);
-
-    // rotatória de areia (raio 3) com jardim de flores no meio do cruzamento central
-    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
-      if (dx * dx + dy * dy <= 9) paintSand(vx + dx, vy - 3 + dy);
-    }
-    for (const [dx, dy] of [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1]]) {
-      const nx = vx + dx, ny = vy - 3 + dy;
-      if (at(nx, ny) === T.SAND) set(nx, ny, T.FLOWER);
-    }
-
-    // mini-praça 3x2 de areia na frente de cada porta + flores nos cantos
-    const houseFront = (doorX, doorY) => {
-      for (let ddy = 1; ddy <= 2; ddy++) for (let ddx = -1; ddx <= 1; ddx++) paintSand(doorX + ddx, doorY + ddy);
-      for (const [fdx, fdy] of [[-2, 1], [2, 1], [-2, 2], [2, 2]]) paintFlower(doorX + fdx, doorY + fdy);
-    };
-    houseFront(188, 293); houseFront(199, 293); houseFront(210, 293);
-    houseFront(188, 305); houseFront(210, 309);
-
-    // braços de caminho ligando cada porta à avenida principal
-    for (let y = 294; y <= vy - 3; y++) { paint(188, y, T.PATH); paint(199, y, T.PATH); paint(210, y, T.PATH); } // Casas 1-3 descem até y=297
-    for (let y = 306; y <= 308; y++) paint(188, y, T.PATH);                    // Casa4 sai pro sul
-    for (let x = 189; x <= 199; x++) paint(x, 308, T.PATH);                    // e vira até a avenida vertical
-    for (let y = 310; y <= 310; y++) paint(210, y, T.PATH);                    // Casa5 sai pro sul (só um tile)
-    for (let x = 200; x <= 210; x++) paint(x, 310, T.PATH);                    // horizontal até a avenida vertical
-
-    // pequenos círculos de areia com florzinha nos cruzamentos secundários (charm de vilarejo)
-    for (const [cx, cy] of [[188, 297], [210, 297], [199, 308], [200, 310]]) {
-      for (const [dx, dy] of [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1]]) paintSand(cx + dx, cy + dy);
-      paintFlower(cx - 1, cy - 1); paintFlower(cx + 1, cy + 1);
-    }
-
-    // da avenida até a praia: estrada de terra; só o trecho final (areia + mar) é deque de madeira
+    house(vx - 14, vy - 10); house(vx - 3, vy - 10); house(vx + 8, vy - 10);
+    house(vx - 14, vy + 2); house(vx + 8, vy + 6); // a última fica ao sul da estrada do cais
+    for (let y = vy - 4; y <= vy + 9; y++) set(vx, y, T.PATH);
+    for (let x = vx - 12; x <= vx + 12; x++) set(x, vy - 3, T.PATH);
+    // da praça até a praia: estrada de terra; só o trecho final (areia + mar) é deque de madeira
     let shoreX = vx;
     while (shoreX < W - 1 && !isWater(at(shoreX, vy + 4))) shoreX++;
     for (let x = vx + 2; x < shoreX - 5; x++) { set(x, vy + 4, T.PATH); set(x, vy + 5, T.PATH); }
@@ -266,14 +227,13 @@
       set(E.tx, E.ty, T.CAVE);
     }
 
-    // 6) clareira ao redor dos NPCs — só remove obstáculos (árvores, arbustos, pedras)
-    // sem apagar caminhos, praças de areia, flores nem paredes de casas/quiosques
+    // 6) clareira ao redor dos NPCs
     const GROUND = { grass: T.GRASS, snow: T.SNOW, desert: T.SAND, savanna: T.SAV, volcano: T.VOLC, rockisle: T.STONE };
-    const OBSTACLE = new Set([T.TREE, T.PALM, T.CACTUS, T.ACACIA, T.ROCK, T.TALL, T.SAVTALL]);
     for (const n of NPCS) {
       const ground = GROUND[ISLANDS.find(i => i.id === n.island).theme];
       for (let y = -1; y <= 1; y++) for (let x = -1; x <= 1; x++) {
-        if (OBSTACLE.has(at(n.tx + x, n.ty + y))) set(n.tx + x, n.ty + y, ground);
+        const t = at(n.tx + x, n.ty + y);
+        if (t !== T.PLANK && t !== T.PATH && t !== T.SHALLOW && t !== T.DEEP && t !== T.FAROLBASE && t !== T.KIOSK) set(n.tx + x, n.ty + y, ground);
       }
     }
 
