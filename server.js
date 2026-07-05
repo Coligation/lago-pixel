@@ -461,6 +461,12 @@ function getProfile(name) {
     color: Number.isFinite(p.color) ? p.color : null, // cor da roupa
     totalCaught: p.totalCaught || 0,
     bestCatch: p.bestCatch || null,
+    // rastro de presença (pro painel /admin)
+    firstSeen: p.firstSeen || null,
+    lastSeen: p.lastSeen || null,
+    sessions: p.sessions || 0,
+    playMin: p.playMin || 0,
+    hist: Array.isArray(p.hist) ? p.hist : [], // últimas sessões {in, out}
   };
   return profiles[name];
 }
@@ -511,8 +517,50 @@ function rollFish(zone, luck, ev) {
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.ico': 'image/x-icon' };
 
+// painel do administrador: /admin?pass=SENHA_DE_GM — lista jogadores e sessões
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function adminPage() {
+  const fmt = (t) => t ? new Date(t).toLocaleString('pt-BR', {
+    timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
+  const online = new Set([...players.values()].map((p) => p.name));
+  const entries = Object.entries(profiles).sort((a, b) => (b[1].lastSeen || 0) - (a[1].lastSeen || 0));
+  const rows = entries.map(([name, p]) => {
+    const hist = (p.hist || []).slice(-8).reverse()
+      .map((h) => `${fmt(h.in)} → ${fmt(h.out)} <span class="dim">(${Math.max(1, Math.round((h.out - h.in) / 60000))} min)</span>`)
+      .join('<br>');
+    return `<tr>
+      <td>${online.has(name) ? '🟢 ' : ''}<b>${esc(name)}</b></td>
+      <td>${p.auth ? esc(p.auth.email) + (p.auth.news ? ' 📬' : '') : '<i class="dim">sem cadastro</i>'}</td>
+      <td>${p.level || 1}</td>
+      <td>${fmt(p.firstSeen)}</td><td>${fmt(p.lastSeen)}</td>
+      <td>${p.sessions || 0}</td><td>${Math.round(p.playMin || 0)} min</td>
+      <td class="hist">${hist || '—'}</td></tr>`;
+  }).join('');
+  const cad = entries.filter(([, p]) => p.auth).length;
+  return `<!DOCTYPE html><html lang="pt-BR"><meta charset="utf-8"><meta name="robots" content="noindex">
+<title>Lago Pixel — Admin</title>
+<style>
+ body { background:#101820; color:#dde; font-family:system-ui; padding:20px; }
+ h1 { font-size:20px; } .dim { color:#89a; }
+ table { border-collapse:collapse; width:100%; margin-top:12px; font-size:13px; }
+ th, td { border:1px solid #2a4560; padding:6px 9px; text-align:left; vertical-align:top; }
+ th { background:#16283a; color:#9fd6ff; } tr:nth-child(even) { background:rgba(255,255,255,.03); }
+ .hist { font-size:11px; color:#abc; }
+</style>
+<h1>🎣 Lago Pixel — Jogadores</h1>
+<p>${entries.length} conta(s) · ${cad} cadastrada(s) com email · ${online.size} online agora · gerado ${fmt(Date.now())}</p>
+<table><tr><th>Nick</th><th>Email</th><th>Nível</th><th>1ª entrada</th><th>Última saída</th><th>Sessões</th><th>Tempo total</th><th>Últimas sessões (entrada → saída)</th></tr>${rows}</table>
+<p class="dim">📬 = aceitou receber novidades · 🟢 = online · histórico guarda as últimas 20 sessões por jogador</p></html>`;
+}
+
 const httpServer = http.createServer((req, res) => {
   let urlPath = decodeURIComponent(req.url.split('?')[0]);
+  if (urlPath === '/admin') {
+    const pass = new URL(req.url, 'http://x').searchParams.get('pass');
+    if (!GM_PASS || pass !== GM_PASS) { res.writeHead(403); return res.end('403'); }
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+    return res.end(adminPage());
+  }
   if (urlPath === '/') urlPath = '/index.html';
   const filePath = path.join(PUBLIC_DIR, path.normalize(urlPath));
   if (!filePath.startsWith(PUBLIC_DIR)) { res.writeHead(403); return res.end(); }
@@ -716,7 +764,8 @@ wss.on('connection', (ws) => {
 
       player = { ws, id: nextId++, name, x: WORLD.SPAWN.x, y: WORLD.SPAWN.y, dir: 'down',
         moving: false, boat: false, profile: getProfile(name), fishing: null,
-        bobX: null, bobY: null, lastChat: 0, gm: false };
+        bobX: null, bobY: null, lastChat: 0, gm: false, sessionStart: Date.now() };
+      if (!player.profile.firstSeen) player.profile.firstSeen = player.sessionStart;
       players.set(ws, player);
       saveDirty = true;
 
@@ -1128,6 +1177,13 @@ wss.on('connection', (ws) => {
 
   ws.on('close', () => {
     if (player) {
+      const prf = player.profile, now = Date.now();
+      if (player.sessionStart) { // registra a sessão (entrada → saída)
+        prf.lastSeen = now;
+        prf.sessions = (prf.sessions || 0) + 1;
+        prf.playMin = +((prf.playMin || 0) + (now - player.sessionStart) / 60000).toFixed(1);
+        prf.hist = [...(prf.hist || []), { in: player.sessionStart, out: now }].slice(-20);
+      }
       dropRiders(player); // se era dono de barco com passageiros
       clearFishing(player);
       players.delete(ws);
