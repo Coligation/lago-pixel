@@ -32,8 +32,8 @@
   };
 
   const NPCS = [
-    { id: 'ze',       name: 'Teodoro',          role: 'shop',     island: 'vila', tx: 202, ty: 296 },
-    { id: 'nino',     name: 'Capitão Nereu',    role: 'boatshop', island: 'vila', tx: 208, ty: 301 },
+    { id: 'ze',       name: 'Teodoro',          role: 'shop',     island: 'vila', tx: 202, ty: 297 },
+    { id: 'nino',     name: 'Capitão Nereu',    role: 'boatshop', island: 'vila', tx: 208, ty: 300 },
     { id: 'bia',      name: 'Beatriz',          role: 'quest', island: 'vila',    tx: 194, ty: 304 },
     { id: 'pedro',    name: 'Bartolomeu',       role: 'quest', island: 'vila',    tx: 246, ty: 304 },
     { id: 'ilo',      name: 'Ismael',           role: 'quest', island: 'farol',   tx: 397, ty: 304 },
@@ -197,9 +197,9 @@
     const far = ISLANDS.find(i => i.id === 'farol');
     for (let y = -1; y <= 0; y++) for (let x = -1; x <= 1; x++) set(far.cx + x, far.cy + y, T.FAROLBASE);
 
-    // 5b) quiosques: Zé (itens, na praça) e Nino (barcos, no começo do cais)
+    // 5b) quiosques: os dois viram o balcão pra o caminho horizontal (y=297) — barraca de peixe ao norte, de barcos ao sul
     for (let y = 295; y <= 296; y++) for (let x = 203; x <= 205; x++) set(x, y, T.KIOSK);
-    for (let y = 300; y <= 301; y++) for (let x = 209; x <= 211; x++) set(x, y, T.KIOSK);
+    for (let y = 298; y <= 299; y++) for (let x = 209; x <= 211; x++) set(x, y, T.KIOSK);
 
     // 5c) interior do farol (sala de pedra isolada no oceano NO)
     for (let y = INTERIOR.y0; y <= INTERIOR.y1; y++) for (let x = INTERIOR.x0; x <= INTERIOR.x1; x++) {
