@@ -606,6 +606,10 @@ function getProfile(name) {
     color: Number.isFinite(p.color) ? p.color : null, // cor da roupa
     totalCaught: p.totalCaught || 0,
     bestCatch: p.bestCatch || null,
+    // última localização (pra reaparecer onde saiu no próximo login)
+    lastX: Number.isFinite(p.lastX) ? p.lastX : null,
+    lastY: Number.isFinite(p.lastY) ? p.lastY : null,
+    lastDir: ['up', 'down', 'left', 'right'].includes(p.lastDir) ? p.lastDir : null,
     // rastro de presença (pro painel /admin)
     firstSeen: p.firstSeen || null,
     lastSeen: p.lastSeen || null,
@@ -876,6 +880,14 @@ setInterval(() => {
 }, 30000);
 
 // checkpoint: sessão em andamento vai sendo gravada — nem reinício do servidor perde
+// último ponto seguro do jogador: sem barco alheio, dentro do mapa, em terra andável
+function snapshotPos(p) {
+  if (p.riding) return; // no barco do outro — a posição pertence ao dono
+  const px = Math.round(p.x), py = Math.round(p.y);
+  if (!WORLD.WALK_OK.has(tileAt(px, py))) return; // barco na água: também não persiste
+  p.profile.lastX = px; p.profile.lastY = py; p.profile.lastDir = p.dir;
+}
+
 setInterval(() => {
   const now = Date.now();
   for (const p of players.values()) {
@@ -883,6 +895,7 @@ setInterval(() => {
     p.lastTick = now;
     p.profile.lastSeen = now;
     if (p.sessEntry) p.sessEntry.out = now;
+    snapshotPos(p);
   }
   if (players.size) saveDirty = true;
 }, 60000);
@@ -932,8 +945,19 @@ wss.on('connection', (ws) => {
         if (op.name === name) { send(ows, 'auth_error', { text: trp(op, 'Você entrou em outro aparelho.') }); ows.close(); }
       }
 
-      player = { ws, id: nextId++, name, lang: L, x: WORLD.SPAWN.x, y: WORLD.SPAWN.y, dir: 'down',
-        moving: false, boat: false, profile: getProfile(name), fishing: null,
+      // reaparece onde saiu (se a última posição salva ainda é um tile andável)
+      const prof0 = getProfile(name);
+      let sx = WORLD.SPAWN.x, sy = WORLD.SPAWN.y, sd = 'down';
+      if (Number.isFinite(prof0.lastX) && Number.isFinite(prof0.lastY)) {
+        const px = Math.max(8, Math.min(WORLD.W * WORLD.TILE - 8, prof0.lastX));
+        const py = Math.max(8, Math.min(WORLD.H * WORLD.TILE - 8, prof0.lastY));
+        if (WORLD.WALK_OK.has(tileAt(px, py))) {
+          sx = px; sy = py;
+          if (prof0.lastDir) sd = prof0.lastDir;
+        }
+      }
+      player = { ws, id: nextId++, name, lang: L, x: sx, y: sy, dir: sd,
+        moving: false, boat: false, profile: prof0, fishing: null,
         bobX: null, bobY: null, lastChat: 0, gm: false, sessionStart: Date.now() };
       player.profile.lang = L;
       { // abre a sessão já na entrada (saída vai sendo atualizada pelo checkpoint)
@@ -951,6 +975,7 @@ wss.on('connection', (ws) => {
       send(ws, 'welcome', {
         token: player.profile.auth.token,
         id: player.id, name, you: profileView(player),
+        x: player.x, y: player.y, dir: player.dir,
         players: [...players.values()].filter(p => p !== player).map(publicState),
         drops: [...drops.values()],
         timeOffset, dayLen: DAY_LEN, event: luckEvent, zones: zonesView(),
@@ -1382,6 +1407,7 @@ wss.on('connection', (ws) => {
       prf.lastSeen = now; // fecha a sessão (o grosso já foi gravado pelos checkpoints)
       prf.playMin = +((prf.playMin || 0) + (now - player.lastTick) / 60000).toFixed(1);
       if (player.sessEntry) player.sessEntry.out = now;
+      snapshotPos(player); // guarda onde parou pro próximo login
       dropRiders(player); // se era dono de barco com passageiros
       clearFishing(player);
       players.delete(ws);

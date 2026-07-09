@@ -1053,6 +1053,9 @@ function connect(payload) {
         if (m.token) localStorage.setItem('lp_token', m.token);
         lgMsg('');
         me.id = m.id; me.name = m.name;
+        // reaparece onde saiu (servidor manda a posição salva ou o SPAWN)
+        if (Number.isFinite(m.x) && Number.isFinite(m.y)) { me.x = m.x; me.y = m.y; }
+        if (m.dir) me.dir = m.dir;
         profile = m.you; catalog = m.catalog;
         fishCat = new Map(catalog.fish.map((x) => [x.id, x]));
         timeOffset = m.timeOffset || 0; dayLen = m.dayLen || 1200; luckEvent = !!m.event;
