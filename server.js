@@ -653,6 +653,10 @@ function rollFish(zone, luck, ev) {
     if (evPool.length && Math.random() < 0.65) pool = evPool;
   }
   if (!pool.length) pool = FISH.filter(f => f.rarity === 'comum' && f.zones.includes(pz));
+  // fallback final: algumas zonas (ex: farol) não têm peixe cadastrado em toda raridade —
+  // cai no pool universal pra não travar o servidor
+  if (!pool.length) pool = FISH.filter(f => f.zones[0] === '*');
+  if (!pool.length) pool = FISH; // paranoia total: sempre devolve algo
   const spec = pool[Math.floor(Math.random() * pool.length)];
   const t = Math.random() * Math.random();
   const weight = +(spec.wmin + (spec.wmax - spec.wmin) * (1 - t)).toFixed(2);
