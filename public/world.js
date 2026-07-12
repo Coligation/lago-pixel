@@ -66,7 +66,7 @@
   ];
 
   // assentos dos passageiros nos barcos (deslocamento em px a partir do dono)
-  const SEAT_OFF = [[-11, 3], [11, 3], [0, 8]];
+  const SEAT_OFF = [[-11, 3], [11, 3], [0, 8], [-14, -2], [14, -2]]; // 5 lugares (o Alvorada leva a galera toda)
 
   function h2(x, y) {
     let n = (x * 374761393 + y * 668265263) | 0;

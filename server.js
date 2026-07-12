@@ -83,6 +83,15 @@ const FISH = [
   { id: 'enguiapolar', name: 'Enguia-Polar',         rarity: 'raro',     base: 118,  wmin: 2.0,  wmax: 12.0,  zones: ['gelo'] },
   { id: 'narval',     name: 'Narval-Anão',           rarity: 'epico',    base: 420,  wmin: 30.0, wmax: 150.0, zones: ['gelo'] },
   { id: 'coracaogelo', name: 'Coração-de-Gelo',      rarity: 'lendario', base: 2400, wmin: 1.0,  wmax: 5.0,   zones: ['gelo'] },
+  // farol
+  { id: 'sargobruma',  name: 'Sargo-da-Bruma',       rarity: 'comum',    base: 11,   wmin: 0.5,  wmax: 3.0,   zones: ['farol'] },
+  { id: 'donzelafarol', name: 'Donzela-do-Farol',    rarity: 'comum',    base: 9,    wmin: 0.2,  wmax: 1.2,   zones: ['farol'] },
+  { id: 'garoupapedra', name: 'Garoupa-das-Pedras',  rarity: 'incomum',  base: 36,   wmin: 2.0,  wmax: 15.0,  zones: ['farol'] },
+  { id: 'lampreialuz', name: 'Lampreia-Luminosa',    rarity: 'incomum',  base: 40,   wmin: 0.8,  wmax: 5.0,   zones: ['farol'] },
+  { id: 'vigia',       name: 'Peixe-Vigia',          rarity: 'raro',     base: 125,  wmin: 3.0,  wmax: 20.0,  zones: ['farol'] },
+  { id: 'salmonete',   name: 'Salmonete-Real',       rarity: 'raro',     base: 110,  wmin: 1.0,  wmax: 6.0,   zones: ['farol'] },
+  { id: 'sentinela',   name: 'Sentinela-da-Neblina', rarity: 'epico',    base: 430,  wmin: 10.0, wmax: 60.0,  zones: ['farol'] },
+  { id: 'estrelaguia', name: 'Estrela-Guia',         rarity: 'lendario', base: 2800, wmin: 2.0,  wmax: 12.0,  zones: ['farol'] },
   // vulcão
   // míticos (rosa) e abissais (vermelho) — os mais difíceis do jogo
   { id: 'sereia',     name: 'Cauda-de-Sereia',       rarity: 'mitico',   base: 7000,  wmin: 10.0,  wmax: 60.0,  zones: ['altomar', 'farol'] },
@@ -136,6 +145,7 @@ const BOATS = {
   remo:    { name: 'Barco a Remo',    price: 800,   level: 5,  speed: 1.0,  seats: 1 },
   lancha:  { name: 'Lancha',          price: 5000,  level: 10, speed: 1.9,  seats: 2 },
   veleiro: { name: 'Caravela',        price: 18000, level: 15, speed: 2.6,  seats: 3 },
+  alvorada: { name: 'Alvorada',       price: 999999, level: 1, speed: 3.4,  seats: 5, secret: true }, // o navio perdido — só na saga final, não se vende
 };
 const BAITS = {
   minhoca:   { name: 'Minhoca',         price: 25,  pack: 10, biteFactor: 0.5,  luckBonus: 0 },
@@ -185,61 +195,92 @@ const QUESTS = {
     { text: 'Registre 6 espécies diferentes na coleção.',           type: 'dex',     need: 6, reward: { coins: 250, xp: 80 } },
     { text: 'Pesque um peixe Raro ou melhor.',                      type: 'rarity',  min: 'raro', need: 1, reward: { coins: 350, xp: 120 } },
     { text: 'Pesque em 3 zonas diferentes (compre um barco!).',     type: 'zones',   need: 3, reward: { coins: 600, xp: 200 } },
+    // saga do Alvorada (pós-Guardião)
+    { text: 'O Pedro te contou do Alvorada? O capitão Aurélio era meu avô. A vovó dizia que ele anotava cada peixe que via no caderno de bordo... Registre 40 espécies e complete o caderno que ele deixou pra mim.', type: 'dex', need: 40, after: 'guardiao', reward: { coins: 6000, xp: 2000 } },
+    { text: "Na última página do caderno, com a letra tremida, o vovô escreveu: 'o mar devolve tudo o que ama'. Pesque um peixe Mítico... eu preciso acreditar que é verdade.", type: 'rarity', min: 'mitico', need: 1, after: 'guardiao', reward: { coins: 14000, xp: 4000 } },
   ],
   omar: [
     { text: 'Pesque 3 peixes aqui na Duna Seca.',                   type: 'zone',    zone: 'deserto', need: 3, reward: { coins: 180, xp: 60 } },
     { text: 'Traga-me um Peixe-Pulmonado do oásis.',                type: 'species', fish: 'pulmonado', need: 1, reward: { coins: 300, xp: 100 } },
     { text: "Um Escorpião-d'Água picou meu camelo. Vingue-o!",      type: 'species', fish: 'escorpiao', need: 1, reward: { coins: 700, xp: 220 } },
+    // saga do Alvorada
+    { text: 'Numa tempestade de areia, o deserto me mostrou uma visão: a proa de um navio dormindo sob as dunas, com o nome ALVORADA gravado na madeira. O Olho-de-Miragem sabe se foi sonho ou memória. Traga-o até mim.', type: 'species', fish: 'miragem', need: 1, after: 'guardiao', reward: { coins: 12000, xp: 3200 } },
   ],
   adama: [
     { text: 'Pesque 3 peixes na Costa Dourada.',                    type: 'zone',    zone: 'savana', need: 3, reward: { coins: 180, xp: 60 } },
     { text: 'O Peixe-Tigre rasgou minha rede. Pesque 2 deles!',     type: 'species', fish: 'tigre', need: 2, reward: { coins: 400, xp: 130 } },
     { text: 'Dizem que a Perca-do-Nilo chega a 100 kg. Prove!',     type: 'weight',  fish: 'percanilo', min: 50, need: 1, reward: { coins: 900, xp: 300 } },
+    // saga do Alvorada
+    { text: 'Meu pai viu, há 40 anos, um navio em chamas cruzar o horizonte — o Alvorada. Os tambores da aldeia ainda contam essa noite triste. Pesque o Espírito-da-Savana: ele carrega as memórias de todos os rios.', type: 'species', fish: 'espirito', need: 1, after: 'guardiao', reward: { coins: 12000, xp: 3200 } },
   ],
   nanuk: [
     { text: 'Pesque 3 peixes nas águas geladas.',                   type: 'zone',    zone: 'gelo', need: 3, reward: { coins: 180, xp: 60 } },
     { text: 'O Peixe-Lanterna ilumina meu iglu. Traga um!',         type: 'species', fish: 'lanterna', need: 1, reward: { coins: 350, xp: 110 } },
     { text: 'Lenda local: o Coração-de-Gelo. Encontre-o.',          type: 'species', fish: 'coracaogelo', need: 1, reward: { coins: 3000, xp: 800 } },
+    // saga do Alvorada
+    { text: "O gelo preserva tudo, até a dor. Encontrei num iceberg um remo quebrado com o nome 'Alvorada'. O Peixe-Aurora dança onde marinheiros descansam... traga um, e acenderei uma lamparina por cada um deles.", type: 'species', fish: 'aurora', need: 1, after: 'guardiao', reward: { coins: 15000, xp: 4000 } },
   ],
   vulcana: [
     { text: 'Pesque 3 peixes nas águas do vulcão.',                 type: 'zone',    zone: 'vulcao', need: 3, reward: { coins: 200, xp: 70 } },
     { text: 'Pesque um peixe Épico ou melhor em qualquer lugar.',   type: 'rarity',  min: 'epico', need: 1, reward: { coins: 800, xp: 250 } },
     { text: 'O Dragão-de-Lava dorme na cratera. Acorde-o.',         type: 'species', fish: 'dragaolava', need: 1, reward: { coins: 5000, xp: 1500 } },
+    // saga do Alvorada
+    { text: 'O sino do Alvorada... eu juro que o ouço nas noites quentes, badalando dentro da cratera. Dizem que o Dragão-de-Lava o engoliu. Pesque 2 deles e devolva o som ao silêncio dos que partiram.', type: 'species', fish: 'dragaolava', need: 2, after: 'guardiao', reward: { coins: 13000, xp: 3500 } },
   ],
   ilo: [
     { text: 'Pesque 3 peixes aqui nas pedras do farol.',            type: 'zone',    zone: 'farol', need: 3, reward: { coins: 220, xp: 80 } },
     { text: 'Um Espadarte quase furou meu bote. Pesque um!',        type: 'species', fish: 'espadarte', need: 1, reward: { coins: 500, xp: 160 } },
     { text: 'Nas noites de neblina, vejo um Leviatã... prove que existe.', type: 'species', fish: 'leviata', need: 1, reward: { coins: 4000, xp: 1200 } },
+    // saga do Alvorada — a confissão do faroleiro
+    { text: 'Você precisa saber a verdade... Naquela noite, há 40 anos, o farol estava sob os meus cuidados. Eu adormeci. Quando acordei, o Alvorada já se partia nas pedras. Pesque 10 peixes aqui comigo — a companhia afasta os fantasmas.', type: 'zone', zone: 'farol', need: 10, after: 'guardiao', reward: { coins: 4000, xp: 1200 } },
+    { text: 'Quarenta anos carregando essa culpa... O casco do Alvorada ainda jaz sob estas águas, e o Megalodonte-Jovem ronda os destroços como um cão de guarda. Traga-o, e eu finalmente terei coragem de mergulhar até lá e pedir perdão.', type: 'species', fish: 'megalodonte', need: 1, after: 'guardiao', reward: { coins: 25000, xp: 6000 } },
   ],
   pedro: [
     { text: 'Ah, a juventude! Pesque 5 peixes pra este velho.',     type: 'count',   need: 5, reward: { coins: 100, xp: 40 } },
     { text: 'Uma Carpa de 5 kg+ pro meu ensopado de domingo.',      type: 'weight',  fish: 'carpa', min: 5, need: 1, reward: { coins: 150, xp: 60, bait: { id: 'minhoca', n: 10 } } },
     { text: 'Pesque 10 peixes na vila e leve minha velha vara.',    type: 'zone',    zone: 'vila', need: 10, reward: { coins: 200, xp: 120, rod: 'fibra' } },
+    // saga do Alvorada — o único sobrevivente
+    { text: 'Sente-se, jovem. Há 40 anos, o navio Alvorada partiu desta vila com meus seis melhores amigos a bordo... e só eu voltei, agarrado a um barril. Pesque 15 peixes na vila enquanto este velho junta coragem pra contar o resto.', type: 'zone', zone: 'vila', need: 15, after: 'guardiao', reward: { coins: 2500, xp: 900 } },
+    { text: "O capitão Aurélio ria como trovão. Na véspera da partida, ele soltou sua Carpa Koi Dourada no lago e disse: 'ela vai me esperar'. Ela ainda espera. Encontre-a... por ele.", type: 'species', fish: 'koi', need: 1, after: 'guardiao', reward: { coins: 9000, xp: 2600, bait: { id: 'brilhante', n: 15 } } },
   ],
   kira: [
     { text: 'O degelo assusta os peixes. Pesque 5 aqui no gelo.',   type: 'zone',    zone: 'gelo', need: 5, reward: { coins: 250, xp: 90 } },
     { text: 'Preciso de 3 Bacalhaus pro banquete da aldeia.',       type: 'species', fish: 'bacalhau', need: 3, reward: { coins: 350, xp: 120, bait: { id: 'brilhante', n: 5 } } },
     { text: 'A Enguia-Polar rouba minhas redes. Capture-a!',        type: 'species', fish: 'enguiapolar', need: 1, reward: { coins: 600, xp: 200, line: 'trancada' } },
+    // saga do Alvorada
+    { text: "Meu avô resgatou um náufrago meio congelado, há 40 anos — era o Pedro, da vila! Ele delirava sobre 'um farol que não acendeu'. Pesque 3 Narvais-Anões: dizem que seus chifres apontam pra verdades esquecidas.", type: 'species', fish: 'narval', need: 3, after: 'guardiao', reward: { coins: 8000, xp: 2400 } },
   ],
   zahra: [
     { text: 'As dunas cantam... pesque 5 peixes no deserto.',       type: 'zone',    zone: 'deserto', need: 5, reward: { coins: 250, xp: 90 } },
     { text: 'Traga 3 Piabas pro chá do acampamento.',               type: 'species', fish: 'piaba', need: 3, reward: { coins: 300, xp: 110 } },
     { text: 'A Serpente-de-Areia guarda um tesouro: derrote-a!',    type: 'species', fish: 'serpente', need: 1, reward: { coins: 1000, xp: 350, rod: 'carbono' } },
+    // saga do Alvorada
+    { text: "Esta noite as dunas cantaram um nome: 'Aurélio'... Uma Serpente-de-Areia de 25 kg engoliu algo que brilha como bronze — talvez a luneta do capitão. Traga a serpente, e devolveremos a luneta à família dele.", type: 'weight', fish: 'serpente', min: 25, need: 1, after: 'guardiao', reward: { coins: 8000, xp: 2400 } },
   ],
   kofi: [
     { text: 'O rio da savana está generoso. Pesque 5 peixes aqui.', type: 'zone',    zone: 'savana', need: 5, reward: { coins: 250, xp: 90 } },
     { text: 'Tilápias-Zebra, 4 delas, pro mercado de amanhã.',      type: 'species', fish: 'zebra', need: 4, reward: { coins: 300, xp: 110 } },
     { text: 'O Bagre-Gigante engoliu meu tambor. Recupere-o!',      type: 'species', fish: 'bagreafro', need: 1, reward: { coins: 900, xp: 300, bait: { id: 'brilhante', n: 10 } } },
+    // saga do Alvorada
+    { text: 'Os pescadores antigos juram que o leme do Alvorada afundou nesta costa, e que a maior Perca-do-Nilo do rio dorme enroscada nele. Uma de 80 kg ou mais deve conhecer o caminho até os destroços.', type: 'weight', fish: 'percanilo', min: 80, need: 1, after: 'guardiao', reward: { coins: 8000, xp: 2400 } },
   ],
   brasa: [
     { text: 'As águas ferventes têm sabor único. Pesque 5 aqui.',   type: 'zone',    zone: 'vulcao', need: 5, reward: { coins: 300, xp: 100 } },
     { text: 'Um Peixe-Magma pra forjar minha nova faca!',           type: 'species', fish: 'magma', need: 1, reward: { coins: 500, xp: 160 } },
     { text: 'A Enguia-de-Fogo... dizem que seu couro não queima.',  type: 'species', fish: 'enguiafogo', need: 1, reward: { coins: 1200, xp: 400 } },
+    // saga do Alvorada
+    { text: 'Um segredo: forjei minha primeira faca com o aço que o mar cuspiu na praia — era do casco do Alvorada. Nunca contei a ninguém. Pesque 20 peixes no vulcão enquanto eu forjo algo em retribuição aos que se foram.', type: 'zone', zone: 'vulcao', need: 20, after: 'guardiao', reward: { coins: 6000, xp: 1800, bait: { id: 'larva', n: 12 } } },
   ],
   guardiao: [
     { text: 'Você chegou longe, pescador. Prova final: traga-me 2 peixes LENDÁRIOS e a Vara do Guardião será sua.', type: 'rarity', min: 'lendario', need: 2, reward: { coins: 5000, xp: 2500, rod: 'guardia' } },
+    // saga do Alvorada — o desfecho
+    { text: 'Sinto o peso que você carrega: a história do Alvorada. Saiba então a verdade — naquela noite, fui EU quem ergueu o navio das pedras e o guardou no abismo, intacto, esperando alguém digno de levá-lo de volta ao mundo. Traga-me 2 peixes ABISSAIS e o Alvorada navegará de novo... com você ao leme.', type: 'rarity', min: 'abissal', need: 2, after: 'guardiao', reward: { coins: 30000, xp: 10000, boat: 'alvorada' } },
   ],
 };
+
+// a saga do Alvorada só abre depois de conquistar a Vara do Guardião
+const guardiaoDone = (pr) => pr.quests.guardiao && pr.quests.guardiao.idx >= 1;
+const questGated = (pr, q) => !!(q && q.after === 'guardiao' && !guardiaoDone(pr));
 
 // ---------------------------------------------------------------- conquistas
 
@@ -275,7 +316,11 @@ const EN_FISH = {
   miragem: 'Mirage Eye', zebra: 'Zebra Tilapia', tigre: 'Tigerfish', elefante: 'Elephantfish',
   percanilo: 'Nile Perch', bagreafro: 'Giant African Catfish', espirito: 'Savanna Spirit',
   bacalhau: 'Arctic Cod', salmogelo: 'Ice Salmon', lanterna: 'Lanternfish', enguiapolar: 'Polar Eel',
-  narval: 'Dwarf Narwhal', coracaogelo: 'Heart of Ice', sereia: "Mermaid's Tail", aurora: 'Aurora Fish',
+  narval: 'Dwarf Narwhal', coracaogelo: 'Heart of Ice',
+  sargobruma: 'Mist Bream', donzelafarol: 'Lighthouse Damselfish', garoupapedra: 'Rock Grouper',
+  lampreialuz: 'Luminous Lamprey', vigia: 'Watcher Fish', salmonete: 'Royal Mullet',
+  sentinela: 'Fog Sentinel', estrelaguia: 'Guiding Star',
+  sereia: "Mermaid's Tail", aurora: 'Aurora Fish',
   quimera: 'Oasis Chimera', faisca: 'Eternal Spark', megalodonte: 'Young Megalodon',
   horror: 'Abyssal Horror', primordial: 'Primordial Fish',
   moedaantiga: 'Ancient Coin', perola: 'Abyss Pearl', cristal: 'Sea Crystal', ambar: 'Millennial Amber', reliquia: 'Lost Relic',
@@ -288,7 +333,7 @@ const EN_ITEM = {
   bambu: 'Bamboo Rod', junco: 'Reed Rod', fibra: 'Fiber Rod', carbono: 'Carbon Rod',
   obsidiana: 'Obsidian Rod', dourada: 'Golden Rod', guardia: "Guardian's Rod",
   nylon: 'Nylon Line', trancada: 'Braided Line', encerada: 'Waxed Line', aco: 'Steel Line',
-  prancha: 'Paddleboard', remo: 'Rowboat', lancha: 'Speedboat', veleiro: 'Caravel',
+  prancha: 'Paddleboard', remo: 'Rowboat', lancha: 'Speedboat', veleiro: 'Caravel', alvorada: 'Alvorada — the Dawn Ship',
   minhoca: 'Worm', cupim: 'Golden Termite', krill: 'Frozen Krill', brilhante: 'Shiny Lure', larva: 'Magma Larva',
 };
 const EN_RAR = { lixo: 'Junk', comum: 'Common', incomum: 'Uncommon', raro: 'Rare', epico: 'Epic', lendario: 'Legendary', mitico: 'Mythic', abissal: 'Abyssal' };
@@ -298,18 +343,33 @@ const EN_SHOP_TITLE = {
   rashid: "🏜️ Rashid's Bazaar", ayo: "🌾 Ayo's Hut", magda: "🌋 Magda's Forge",
 };
 const EN_QUESTS = {
-  bia: ['Catch 3 fish of any kind.', 'Catch a Tilapia weighing 1.5 kg or more.', 'Register 6 different species in your collection.', 'Catch a Rare fish or better.', 'Fish in 3 different zones (buy a boat!).'],
-  omar: ['Catch 3 fish here in the Dry Dune.', 'Bring me a Lungfish from the oasis.', 'A Water Scorpion stung my camel. Avenge it!'],
-  zahra: ['The dunes are singing... catch 5 fish in the desert.', 'Bring 3 Desert Piabas for the camp tea.', 'The Sand Serpent guards a treasure: defeat it!'],
-  adama: ['Catch 3 fish on the Golden Coast.', 'The Tigerfish tore my net. Catch 2 of them!', 'They say the Nile Perch reaches 100 kg. Prove it!'],
-  kofi: ['The savanna river is generous. Catch 5 fish here.', 'Zebra Tilapias, 4 of them, for tomorrow\'s market.', 'The Giant Catfish swallowed my drum. Get it back!'],
-  nanuk: ['Catch 3 fish in the icy waters.', 'The Lanternfish lights up my igloo. Bring one!', 'Local legend: the Heart of Ice. Find it.'],
-  kira: ['The thaw scares the fish. Catch 5 here on the ice.', 'I need 3 Arctic Cod for the village feast.', 'The Polar Eel keeps stealing my nets. Capture it!'],
-  vulcana: ['Catch 3 fish in the volcano waters.', 'Catch an Epic fish or better anywhere.', 'The Lava Dragon sleeps in the crater. Wake it.'],
-  brasa: ['The boiling waters have a unique flavor. Catch 5 here.', 'A Magma Fish to forge my new knife!', "The Fire Eel... they say its hide doesn't burn."],
-  ilo: ['Catch 3 fish here by the lighthouse rocks.', 'A Swordfish nearly pierced my dinghy. Catch one!', 'On foggy nights I see a Leviathan... prove it exists.'],
-  pedro: ['Ah, youth! Catch 5 fish for this old man.', 'A 5 kg+ Carp for my Sunday stew.', 'Catch 10 fish in the village and take my old rod.'],
-  guardiao: ['You have come far, angler. Final trial: bring me 2 LEGENDARY fish and the Guardian\'s Rod is yours.'],
+  bia: ['Catch 3 fish of any kind.', 'Catch a Tilapia weighing 1.5 kg or more.', 'Register 6 different species in your collection.', 'Catch a Rare fish or better.', 'Fish in 3 different zones (buy a boat!).',
+    "Did Pedro tell you about the Alvorada? Captain Aurélio was my grandfather. Grandma said he noted every fish he ever saw in his logbook... Register 40 species and finish the logbook he left me.",
+    "On the last page, in shaky handwriting, grandpa wrote: 'the sea returns everything it loves'. Catch a Mythic fish... I need to believe it's true."],
+  omar: ['Catch 3 fish here in the Dry Dune.', 'Bring me a Lungfish from the oasis.', 'A Water Scorpion stung my camel. Avenge it!',
+    'In a sandstorm, the desert showed me a vision: the bow of a ship sleeping under the dunes, the name ALVORADA carved in the wood. The Mirage Eye knows if it was dream or memory. Bring it to me.'],
+  zahra: ['The dunes are singing... catch 5 fish in the desert.', 'Bring 3 Desert Piabas for the camp tea.', 'The Sand Serpent guards a treasure: defeat it!',
+    "Tonight the dunes sang a name: 'Aurélio'... A 25 kg Sand Serpent swallowed something that gleams like bronze — perhaps the captain's spyglass. Bring the serpent, and we shall return it to his family."],
+  adama: ['Catch 3 fish on the Golden Coast.', 'The Tigerfish tore my net. Catch 2 of them!', 'They say the Nile Perch reaches 100 kg. Prove it!',
+    'Forty years ago my father saw a burning ship cross the horizon — the Alvorada. The village drums still tell of that sad night. Catch the Savanna Spirit: it carries the memories of every river.'],
+  kofi: ['The savanna river is generous. Catch 5 fish here.', 'Zebra Tilapias, 4 of them, for tomorrow\'s market.', 'The Giant Catfish swallowed my drum. Get it back!',
+    "The old fishermen swear the Alvorada's rudder sank along this coast, and the river's biggest Nile Perch sleeps coiled around it. One of 80 kg or more must know the way to the wreck."],
+  nanuk: ['Catch 3 fish in the icy waters.', 'The Lanternfish lights up my igloo. Bring one!', 'Local legend: the Heart of Ice. Find it.',
+    "The ice preserves everything, even grief. In an iceberg I found a broken oar bearing the name 'Alvorada'. The Aurora Fish dances where sailors rest... bring one, and I will light a lantern for each of them."],
+  kira: ['The thaw scares the fish. Catch 5 here on the ice.', 'I need 3 Arctic Cod for the village feast.', 'The Polar Eel keeps stealing my nets. Capture it!',
+    "Forty years ago my grandfather rescued a half-frozen castaway — it was Pedro, from the village! He raved about 'a lighthouse that never lit'. Catch 3 Dwarf Narwhals: they say their tusks point to forgotten truths."],
+  vulcana: ['Catch 3 fish in the volcano waters.', 'Catch an Epic fish or better anywhere.', 'The Lava Dragon sleeps in the crater. Wake it.',
+    "The Alvorada's bell... I swear I hear it on warm nights, tolling inside the crater. They say the Lava Dragon swallowed it. Catch 2 of them and return the sound to the silence of those who are gone."],
+  brasa: ['The boiling waters have a unique flavor. Catch 5 here.', 'A Magma Fish to forge my new knife!', "The Fire Eel... they say its hide doesn't burn.",
+    "A secret: I forged my first knife from steel the sea spat onto the beach — it was from the Alvorada's hull. I never told anyone. Catch 20 fish in the volcano while I forge something in tribute to the lost."],
+  ilo: ['Catch 3 fish here by the lighthouse rocks.', 'A Swordfish nearly pierced my dinghy. Catch one!', 'On foggy nights I see a Leviathan... prove it exists.',
+    'You need to know the truth... That night, 40 years ago, the lighthouse was in my care. I fell asleep. When I woke, the Alvorada was already breaking on the rocks. Catch 10 fish here with me — company keeps the ghosts away.',
+    'Forty years carrying this guilt... The hull of the Alvorada still lies beneath these waters, and the Young Megalodon circles the wreck like a watchdog. Bring it to me, and I will finally have the courage to dive down and ask forgiveness.'],
+  pedro: ['Ah, youth! Catch 5 fish for this old man.', 'A 5 kg+ Carp for my Sunday stew.', 'Catch 10 fish in the village and take my old rod.',
+    'Sit down, child. Forty years ago, the ship Alvorada left this village with my six best friends aboard... and only I came back, clinging to a barrel. Catch 15 fish in the village while this old man gathers the courage to tell the rest.',
+    "Captain Aurélio laughed like thunder. The eve of departure, he released his Golden Koi Carp into the lake and said: 'she will wait for me'. She still waits. Find her... for him."],
+  guardiao: ['You have come far, angler. Final trial: bring me 2 LEGENDARY fish and the Guardian\'s Rod is yours.',
+    "I sense the weight you carry: the story of the Alvorada. Know the truth, then — that night, it was I who lifted the ship from the rocks and kept it in the abyss, intact, waiting for someone worthy of sailing it back into the world. Bring me 2 ABYSSAL fish and the Alvorada shall sail again... with you at the helm."],
 };
 const EN_ACHV = {
   p10: ['Novice Angler', 'Catch 10 fish'], p50: ['Seasoned Angler', 'Catch 50 fish'],
@@ -323,6 +383,7 @@ const EN_ACHV = {
 };
 const EN_TXT = {
   'Balde cheio! Venda ou solte peixes.': 'Bucket full! Sell or drop some fish.',
+  '🔒 Peixe travado! Destrave antes de soltar.': '🔒 Fish locked! Unlock it before dropping.',
   'Balde cheio!': 'Bucket full!',
   'Mire na água!': 'Aim at the water!',
   'Moedas insuficientes!': 'Not enough coins!',
@@ -339,6 +400,7 @@ const EN_TXT = {
   'Sessão expirada — entre com sua senha.': 'Session expired — log in with your password.',
   'Senha incorreta.': 'Wrong password.',
   'Você já me ajudou com tudo. O arquipélago agradece, lenda!': 'You have already helped me with everything. The archipelago thanks you, legend!',
+  'Sinto que ainda há algo não dito entre nós... mas não é a hora. (Conquiste a Vara do Guardião no Farol e volte.)': "I feel there is still something unsaid between us... but it is not the time. (Earn the Guardian's Rod at the Lighthouse and come back.)",
   '\n(Vara repetida — leve as moedas!) ': '\n(Duplicate rod — take the coins instead!) ',
   '\n\nEra a última — obrigado!': '\n\nThat was the last one — thank you!',
   '🌙 MARÉ DE SORTE! Chance em dobro de peixes raros esta noite!': '🌙 LUCKY TIDE! Double chance of rare fish tonight!',
@@ -622,7 +684,7 @@ function getProfile(name) {
 
 // ---------------------------------------------------------------- pesca
 
-function rollFish(zone, luck, ev) {
+function rollFish(zone, luck, ev, forceRarity) {
   const pz = ZONE_WEIGHTS[zone] ? zone : 'altomar';
   const weights = { ...ZONE_WEIGHTS[pz] };
   if (ev && EVENT_TYPES[ev]) { // círculo de evento: raridades turbinadas
@@ -644,6 +706,7 @@ function rollFish(zone, luck, ev) {
   let roll = Math.random() * total;
   let rarity = 'comum';
   for (const r in weights) { roll -= weights[r]; if (roll <= 0) { rarity = r; break; } }
+  if (forceRarity && RARITIES[forceRarity]) rarity = forceRarity; // GM: /abissal força a raridade
 
   let pool = FISH.filter(f => f.rarity === rarity &&
     (f.zones[0] === '*' || f.zones.includes(pz) || (ev && f.zones.includes('ev:' + ev))));
@@ -840,6 +903,7 @@ function questProgress(pr, npcId) { // estado atual da quest ativa do npc
   const st = pr.quests[npcId] || (pr.quests[npcId] = { idx: 0, prog: 0, zones: [] });
   if (st.idx >= chain.length) return { st, q: null, done: false };
   const q = chain[st.idx];
+  if (questGated(pr, q)) return { st, q: null, gated: true, done: false };
   let prog = st.prog;
   if (q.type === 'dex') prog = Object.keys(pr.dex).length;
   if (q.type === 'zones') prog = st.zones.length;
@@ -853,6 +917,7 @@ function onCatchQuests(p, fish) { // avança missões aceitas
     const chain = QUESTS[npcId];
     if (!chain || st.idx >= chain.length) continue;
     const q = chain[st.idx];
+    if (questGated(pr, q)) continue; // saga trancada não acumula progresso escondido
     if (!st.zones.includes(fish.zone)) st.zones.push(fish.zone);
     switch (q.type) {
       case 'count': st.prog++; break;
@@ -1092,7 +1157,8 @@ wss.on('connection', (ws) => {
         player.fishing.biteTimer = setTimeout(() => {
           if (!player.fishing || player.fishing.phase !== 'waiting') return;
           player.fishing.phase = 'bite';
-          player.fishing.fish = rollFish(zone, luck, player.fishing.ev);
+          player.fishing.fish = rollFish(zone, luck, player.fishing.ev, player.forceAbyss ? 'abissal' : null);
+          player.forceAbyss = false;
           send(ws, 'bite', {});
           broadcast('player_state', { player: publicState(player) }, ws);
           player.fishing.windowTimer = setTimeout(() => {
@@ -1181,10 +1247,15 @@ wss.on('connection', (ws) => {
           break;
         }
         const chain = QUESTS[npc.id];
-        const { st, q, prog, done } = questProgress(pr, npc.id);
+        const { st, q, prog, done, gated } = questProgress(pr, npc.id);
         const lg = langOf(player);
         const recebeu = lg === 'en' ? 'You received' : 'Você recebeu';
-        if (!q) { send(ws, 'dialog', { npc: npc.name, text: trp(player, 'Você já me ajudou com tudo. O arquipélago agradece, lenda!') }); break; }
+        if (!q) {
+          send(ws, 'dialog', { npc: npc.name, text: trp(player, gated
+            ? 'Sinto que ainda há algo não dito entre nós... mas não é a hora. (Conquiste a Vara do Guardião no Farol e volte.)'
+            : 'Você já me ajudou com tudo. O arquipélago agradece, lenda!') });
+          break;
+        }
         if (done) {
           pr.coins += q.reward.coins;
           gainXp(player, q.reward.xp);
@@ -1208,6 +1279,16 @@ wss.on('connection', (ws) => {
             pr.baits[q.reward.bait.id] = (pr.baits[q.reward.bait.id] || 0) + q.reward.bait.n;
             extra += `\n🪱 ${recebeu}: ${itemName(lg, q.reward.bait.id, BAITS[q.reward.bait.id].name)} ×${q.reward.bait.n}!`;
           }
+          if (q.reward.boat && BOATS[q.reward.boat] && !pr.boats.includes(q.reward.boat)) {
+            pr.boats.push(q.reward.boat);
+            pr.boat = q.reward.boat;
+            extra += `\n🚢 ${recebeu}: ${itemName(lg, q.reward.boat, BOATS[q.reward.boat].name)}!`;
+            if (q.reward.boat === 'alvorada') {
+              announceAll((l2) => l2 === 'en'
+                ? `🚢 ${player.name} raised the legendary ship ALVORADA from the abyss!`
+                : `🚢 ${player.name} ergueu do abismo o lendário navio ALVORADA!`, 'abissal');
+            }
+          }
           st.idx++; st.prog = 0; st.zones = [];
           saveDirty = true;
           const next = chain[st.idx];
@@ -1227,9 +1308,20 @@ wss.on('connection', (ws) => {
         break;
       }
 
+      case 'lock': { // trava/destrava um peixe do balde (travado não vende nem solta)
+        const i = Number(msg.index);
+        if (!(i >= 0 && i < pr.inventory.length)) break;
+        const f = pr.inventory[i];
+        if (f.locked) delete f.locked; else f.locked = true;
+        saveDirty = true;
+        send(ws, 'bought', { you: profileView(player) });
+        break;
+      }
+
       case 'drop': {
         const i = Number(msg.index);
         if (!(i >= 0 && i < pr.inventory.length)) break;
+        if (pr.inventory[i].locked) { send(ws, 'toast', { text: trp(player, '🔒 Peixe travado! Destrave antes de soltar.') }); break; }
         const [fish] = pr.inventory.splice(i, 1);
         const drop = { id: nextDropId++, fish, x: Math.round(player.x), y: Math.round(player.y), by: player.name, t: Date.now() };
         drops.set(drop.id, drop);
@@ -1260,11 +1352,12 @@ wss.on('connection', (ws) => {
         break;
       }
 
-      case 'sell_all': {
-        if (!pr.inventory.length) break;
-        const total = pr.inventory.reduce((s, f) => s + f.value, 0);
+      case 'sell_all': { // vende só os destravados — os com 🔒 ficam no balde
+        const sold = pr.inventory.filter(f => !f.locked);
+        if (!sold.length) break;
+        const total = sold.reduce((s, f) => s + f.value, 0);
         pr.coins += total;
-        pr.inventory = [];
+        pr.inventory = pr.inventory.filter(f => f.locked);
         saveDirty = true;
         send(ws, 'sold', { total, you: profileView(player) });
         break;
@@ -1365,8 +1458,18 @@ wss.on('connection', (ws) => {
             send(ws, 'bought', { you: profileView(player) });
             broadcast('player_state', { player: publicState(player) }, ws);
             send(ws, 'toast', { text: `Nível ajustado para ${pr.level}.` });
+          } else if (cmd === 'navio') { // GM: recebe o navio secreto da saga
+            if (!pr.boats.includes('alvorada')) pr.boats.push('alvorada');
+            pr.boat = 'alvorada';
+            saveDirty = true;
+            send(ws, 'bought', { you: profileView(player) });
+            broadcast('player_state', { player: publicState(player) }, ws);
+            send(ws, 'toast', { text: '🚢 O Alvorada é seu, capitão!' });
+          } else if (cmd === 'abissal') { // GM: o próximo peixe fisgado será abissal
+            player.forceAbyss = true;
+            send(ws, 'toast', { text: '🌑 O abismo espreita... o próximo peixe fisgado será ABISSAL.' });
           } else {
-            send(ws, 'toast', { text: 'Comandos: /evento /noite /dia /moedas <n> /nivel <n>' });
+            send(ws, 'toast', { text: 'Comandos: /evento /noite /dia /moedas <n> /nivel <n> /navio /abissal' });
           }
           break;
         }
@@ -1383,9 +1486,10 @@ wss.on('connection', (ws) => {
         } else {
           const door = WORLD.FAROL_DOOR;
           if (Math.hypot(door.tx * TL + 8 - player.x, door.ty * TL - player.y) > 3 * TL) break;
-          // só entra quem terminou TODAS as missões do arquipélago (ou GM)
+          // só entra quem terminou TODAS as missões básicas do arquipélago (ou GM);
+          // as missões da saga (after) não contam — senão ninguém entraria pra pegar a Vara
           const pending = Object.keys(QUESTS).filter(id => id !== 'guardiao')
-            .filter(id => !pr.quests[id] || pr.quests[id].idx < QUESTS[id].length);
+            .filter(id => !pr.quests[id] || pr.quests[id].idx < QUESTS[id].filter(q => !q.after).length);
           if (pending.length && !player.gm) {
             send(ws, 'dialog', { npc: 'Porta do Farol',
               text: langOf(player) === 'en'

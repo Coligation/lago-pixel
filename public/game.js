@@ -31,6 +31,9 @@ const EN_UI = {
   'Nenhum barco — compre no Capitão Nereu!': "No boats yet — buy one from Captain Nereu!",
   'Balde vazio... vá pescar!': 'Bucket empty... go fish!',
   'balde vazio': 'empty bucket',
+  'Soltar': 'Drop', 'destravar': 'unlock', 'travar (não vende nem solta)': "lock (won't sell or drop)",
+  'todos os peixes travados 🔒': 'all fish locked 🔒',
+  '🌑 ALGO ABISSAL FISGOU SUA LINHA... 🌑': '🌑 SOMETHING ABYSSAL TOOK YOUR LINE... 🌑',
   '🚣 sem barco (compre no Capitão Nereu!)': "🚣 no boat (buy from Captain Nereu!)",
   'nenhuma': 'none', 'Isca: ': 'Bait: ',
   '👑 Você tem o melhor de tudo!': '👑 You own the best of everything!',
@@ -633,16 +636,26 @@ function refreshInventory() {
   list.innerHTML = '';
   let total = 0;
   profile.inventory.forEach((f, i) => {
-    total += f.value;
+    if (!f.locked) total += f.value;
     const row = document.createElement('div');
     row.className = 'fishrow';
+    if (f.locked) row.style.background = 'rgba(255,210,74,.07)';
     const r = catalog.rarities[f.rarity];
     const info = document.createElement('span');
-    info.innerHTML = `<span style="color:${r.color}">${dispFish(f)}</span> <span style="color:#9ab">${f.weight} kg</span>`;
+    info.innerHTML = `${f.locked ? '🔒 ' : ''}<span style="color:${r.color}">${dispFish(f)}</span> <span style="color:#9ab">${f.weight} kg</span>`;
     const right = document.createElement('span');
-    right.innerHTML = `<b style="color:#ffd24a">${f.value} ${COIN}</b> `;
+    right.innerHTML = `<b style="color:${f.locked ? '#8a7a4a' : '#ffd24a'}">${f.value} ${COIN}</b> `;
+    // trava: peixe travado não é vendido no "vender tudo" nem pode ser solto
+    const lockBtn = document.createElement('button');
+    lockBtn.className = 'btn small';
+    lockBtn.textContent = f.locked ? '🔒' : '🔓';
+    lockBtn.title = f.locked ? TR('destravar') : TR('travar (não vende nem solta)');
+    lockBtn.onclick = () => send({ type: 'lock', index: i });
+    right.appendChild(lockBtn);
+    right.appendChild(document.createTextNode(' '));
     const btn = document.createElement('button');
-    btn.className = 'btn small'; btn.textContent = 'Soltar';
+    btn.className = 'btn small'; btn.textContent = TR('Soltar');
+    btn.disabled = !!f.locked;
     btn.onclick = () => send({ type: 'drop', index: i });
     right.appendChild(btn);
     row.appendChild(info); row.appendChild(right);
@@ -881,12 +894,14 @@ function refreshDex() {
   $('dexcount').textContent = `(${Object.keys(profile.dex).length}/${catalog.fish.length})`;
 }
 
-function questState(npcId) { // null = não aceitou; {q, prog, done} | {allDone}
+const guardiaoDone = () => profile.quests.guardiao && profile.quests.guardiao.idx >= 1;
+function questState(npcId) { // null = não aceitou; {q, prog, done} | {allDone} | {gated}
   const chain = catalog.quests[npcId];
   const st = profile.quests[npcId];
   if (!st) return null;
   if (st.idx >= chain.length) return { allDone: true };
   const q = chain[st.idx];
+  if (q.after === 'guardiao' && !guardiaoDone()) return { gated: true }; // saga trancada
   let prog = st.prog;
   if (q.type === 'dex') prog = Object.keys(profile.dex).length;
   if (q.type === 'zones') prog = (st.zones || []).length;
@@ -901,15 +916,18 @@ function refreshQuests() {
     const npc = NPCS.find(n => n.id === npcId);
     const island = ISLANDS.find(i => i.id === npc.island);
     const chain = catalog.quests[npcId];
+    const visLen = chain.filter(q => !q.after || guardiaoDone()).length; // saga trancada fica escondida na contagem
     const qs = questState(npcId);
     const el = document.createElement('div');
     el.className = 'questitem';
     if (!qs) {
-      el.innerHTML = `<span class="npc">${npc.name}</span> — ${island.name}<br><span style="color:#9ab">${LANG === 'en' ? `Visit to receive a quest. (${chain.length} quests)` : `Visite pra receber uma missão. (${chain.length} missões)`}</span>`;
+      el.innerHTML = `<span class="npc">${npc.name}</span> — ${island.name}<br><span style="color:#9ab">${LANG === 'en' ? `Visit to receive a quest. (${visLen} quests)` : `Visite pra receber uma missão. (${visLen} missões)`}</span>`;
     } else if (qs.allDone) {
       el.innerHTML = `<span class="npc">${npc.name}</span> — ${island.name}<br><span class="prog">${LANG === 'en' ? `✓ All ${chain.length} quests complete!` : `✓ Todas as ${chain.length} missões concluídas!`}</span>`;
+    } else if (qs.gated) {
+      el.innerHTML = `<span class="npc">${npc.name}</span> — ${island.name}<br><span style="color:#9ab">${LANG === 'en' ? "🌑 A story waits to be told... (earn the Guardian's Rod)" : '🌑 Uma história espera pra ser contada... (conquiste a Vara do Guardião)'}</span>`;
     } else {
-      el.innerHTML = `<span class="npc">${npc.name}</span> — ${island.name} <span style="color:#9ab">(${qs.idx + 1}/${qs.total})</span><br>` +
+      el.innerHTML = `<span class="npc">${npc.name}</span> — ${island.name} <span style="color:#9ab">(${qs.idx + 1}/${visLen})</span><br>` +
         `${qs.q.text} <span class="prog">${qs.prog}/${qs.q.need}${qs.done ? TR(' ✓ entregue!') : ''}</span>` +
         `<div class="questbar"><div style="width:${100 * qs.prog / qs.q.need}%"></div></div>`;
     }
@@ -957,10 +975,14 @@ let shopTab = null;
 const SHOP_TABS = [['rod', TR('🎣 Varas')], ['line', TR('🧵 Linhas')], ['bait', TR('🪱 Iscas')], ['boat', TR('⛵ Barcos')]];
 function refreshShop() {
   if (!shopStock) return;
-  const total = profile.inventory.reduce((s, f) => s + f.value, 0);
-  $('selldesc').textContent = profile.inventory.length
-    ? (LANG === 'en' ? `${profile.inventory.length} fish = ${total.toLocaleString('pt-BR')} coins` : `${profile.inventory.length} peixes = ${total.toLocaleString('pt-BR')} moedas`) : TR('balde vazio');
-  $('sellbtn').disabled = !profile.inventory.length;
+  const sellable = profile.inventory.filter(f => !f.locked);
+  const lockedN = profile.inventory.length - sellable.length;
+  const total = sellable.reduce((s, f) => s + f.value, 0);
+  const lockNote = lockedN ? (LANG === 'en' ? ` (${lockedN} 🔒 stay)` : ` (${lockedN} 🔒 ficam)`) : '';
+  $('selldesc').textContent = sellable.length
+    ? (LANG === 'en' ? `${sellable.length} fish = ${total.toLocaleString('pt-BR')} coins${lockNote}` : `${sellable.length} peixes = ${total.toLocaleString('pt-BR')} moedas${lockNote}`)
+    : (lockedN ? TR('todos os peixes travados 🔒') : TR('balde vazio'));
+  $('sellbtn').disabled = !sellable.length;
   $('shoptitle').textContent = shopStock.title;
   $('shopsellrow').style.display = 'flex'; // todo vendedor compra peixe
   const stock = shopStock.stock;
@@ -1595,7 +1617,8 @@ function startReel(reelTime, speed, barPx, drain, rarity, color) {
   reel = { fishPos: 0.5, fishVel: 0, zonePos: 0.5, zoneVel: 0, zoneH: barPx / 260,
     progress: 0.35, speed, reelTime, drain: drain || 1, wobT: 0,
     rarity: rarity || 'comum', color: color || '#f0f0f0',
-    elapsed: 0, tired: 0 };
+    elapsed: 0, tired: 0, t0: performance.now() };
+  if (rarity === 'abissal') sfx.fail(); // baque grave: algo enorme fisgou...
 }
 
 function updateReel(dt) {
@@ -3143,11 +3166,32 @@ const BOAT_SPRITES = (() => {
     g.fillStyle = '#c8503a'; g.fillRect(7, 4.5, 2, 31);
   });
 
+  // ---------- ALVORADA (navio lendário da saga) ----------
+  // a caravela renasce espectral: casco azul-noite, velas com brilho fantasmagórico
+  // e reflexo dourado de amanhecer no casco
+  const spectral = (src) => {
+    const c = mkCanvas(src.width, src.height);
+    const g = c.getContext('2d');
+    g.drawImage(src, 0, 0);
+    g.globalCompositeOperation = 'source-atop';
+    g.fillStyle = 'rgba(16,24,66,.55)';
+    g.fillRect(0, 0, c.width, c.height);
+    const sheen = g.createLinearGradient(0, 0, 0, c.height);
+    sheen.addColorStop(0, 'rgba(140,220,255,.32)');
+    sheen.addColorStop(0.55, 'rgba(80,140,255,.10)');
+    sheen.addColorStop(1, 'rgba(255,210,90,.18)');
+    g.fillStyle = sheen;
+    g.fillRect(0, 0, c.width, c.height);
+    return c;
+  };
+  const alvSide = spectral(caravelaSide), alvUp = spectral(caravelaUp), alvDown = spectral(caravelaDown);
+
   return {
     prancha: { right: pranchaSide, left: flipX(pranchaSide), up: pranchaVert, down: pranchaVert },
     remo:    { right: remoSide, left: flipX(remoSide), up: remoUp, down: remoDown },
     lancha:  { right: lanchaSide, left: flipX(lanchaSide), up: lanchaUp, down: lanchaDown },
     veleiro: { right: caravelaSide, left: flipX(caravelaSide), up: caravelaUp, down: caravelaDown },
+    alvorada: { right: alvSide, left: flipX(alvSide), up: alvUp, down: alvDown },
   };
 })();
 
@@ -3158,6 +3202,11 @@ function drawChar(x, y, dir, name, moving, time, boat, fishing, npcColor, hue, r
   if (boat) {
     const set = BOAT_SPRITES[boat] || BOAT_SPRITES.remo;
     const spr = set[dir] || set.right;
+    if (boat === 'alvorada') { // aura espectral do navio lendário
+      const pulse = 0.09 + 0.05 * Math.sin(time * 2.5 + x * 0.05);
+      ctx.fillStyle = `rgba(120,190,255,${pulse.toFixed(3)})`;
+      ctx.beginPath(); ctx.ellipse(x, y - 22, 50, 42, 0, 0, 7); ctx.fill();
+    }
     ctx.fillStyle = 'rgba(10,30,50,.25)';
     ctx.beginPath(); ctx.ellipse(x, y + 5, Math.min(spr.width * 0.44, 30), 5.5, 0, 0, 7); ctx.fill();
     const bobY = Math.sin(time * 2 + x * 0.1) * 1;
@@ -3485,6 +3534,80 @@ function drawFoam(tx, ty, time) {
 }
 
 // ---------------------------------------------------------------- overlays de tela
+
+// véu do abismo: peixe ABISSAL fisgado — a tela escurece em azul profundo, sobrando
+// dois círculos de luz (pescador e área do peixe) cercados por chamas escuras
+const abyssCv = document.createElement('canvas');
+abyssCv.width = 960; abyssCv.height = 540;
+const abyssG = abyssCv.getContext('2d');
+
+function drawDarkFlames(hx, hy, hr, time, seed) {
+  const N = 16;
+  for (let i = 0; i < N; i++) {
+    const a = (i / N) * Math.PI * 2 + time * 0.55 * (seed ? -1 : 1);
+    const flick = 0.55 + 0.45 * Math.sin(time * 7 + i * 2.7 + seed * 3.1);
+    const fl = 10 + 10 * flick; // altura da chama
+    const bx = hx + Math.cos(a) * hr, by = hy + Math.sin(a) * hr;
+    const tx = hx + Math.cos(a) * (hr + fl), ty = hy + Math.sin(a) * (hr + fl);
+    const px = -Math.sin(a), py = Math.cos(a); // perpendicular (largura da chama)
+    const w = 5 + 2.5 * flick;
+    ctx.fillStyle = `rgba(14,26,80,${(0.55 + 0.3 * flick).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.moveTo(bx + px * w, by + py * w);
+    ctx.quadraticCurveTo(bx + Math.cos(a) * fl * 0.5 + px * w * 1.25, by + Math.sin(a) * fl * 0.5 + py * w * 1.25, tx, ty);
+    ctx.quadraticCurveTo(bx + Math.cos(a) * fl * 0.5 - px * w * 1.25, by + Math.sin(a) * fl * 0.5 - py * w * 1.25, bx - px * w, by - py * w);
+    ctx.closePath(); ctx.fill();
+    // núcleo azul mais claro dentro da chama
+    ctx.fillStyle = `rgba(60,100,200,${(0.4 * flick).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.moveTo(bx + px * w * 0.45, by + py * w * 0.45);
+    ctx.quadraticCurveTo(bx + Math.cos(a) * fl * 0.35 + px * w * 0.5, by + Math.sin(a) * fl * 0.35 + py * w * 0.5,
+      hx + Math.cos(a) * (hr + fl * 0.62), hy + Math.sin(a) * (hr + fl * 0.62));
+    ctx.quadraticCurveTo(bx + Math.cos(a) * fl * 0.35 - px * w * 0.5, by + Math.sin(a) * fl * 0.35 - py * w * 0.5,
+      bx - px * w * 0.45, by - py * w * 0.45);
+    ctx.closePath(); ctx.fill();
+  }
+  // anel azul-escuro pulsando na borda do círculo
+  ctx.strokeStyle = `rgba(40,70,170,${(0.5 + 0.25 * Math.sin(time * 4 + seed)).toFixed(3)})`;
+  ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(hx, hy, hr, 0, 7); ctx.stroke();
+}
+
+function drawAbyssVeil(camX, camY, time) {
+  const fade = Math.min(1, (performance.now() - reel.t0) / 900); // surge suave
+  const pulse = Math.sin(time * 2.6) * 4;
+  const holes = [
+    [(me.x - camX) * ZOOM, (me.y - 8 - camY) * ZOOM, 88 + pulse],
+    [(fish.bobX - camX) * ZOOM, (fish.bobY - camY) * ZOOM, 72 - pulse],
+  ];
+  // camada escura com furos (desenhada num canvas próprio pra recortar só o véu)
+  const g = abyssG;
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.globalCompositeOperation = 'source-over';
+  g.clearRect(0, 0, 960, 540);
+  g.fillStyle = `rgba(3,8,28,${(0.82 * fade).toFixed(3)})`;
+  g.fillRect(0, 0, 960, 540);
+  g.globalCompositeOperation = 'destination-out';
+  for (const [hx, hy, hr] of holes) {
+    const rad = g.createRadialGradient(hx, hy, hr * 0.35, hx, hy, hr);
+    rad.addColorStop(0, 'rgba(0,0,0,1)');
+    rad.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = rad;
+    g.beginPath(); g.arc(hx, hy, hr, 0, 7); g.fill();
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
+  ctx.drawImage(abyssCv, 0, 0);
+  // chamas escuras circulares ao redor de cada círculo de luz
+  ctx.globalAlpha = fade;
+  drawDarkFlames(holes[0][0], holes[0][1], holes[0][2], time, 0);
+  drawDarkFlames(holes[1][0], holes[1][1], holes[1][2], time, 1);
+  // aviso sussurrado
+  ctx.font = 'bold 15px monospace'; ctx.textAlign = 'center';
+  ctx.fillStyle = `rgba(120,60,80,${(0.55 + 0.35 * Math.sin(time * 3)).toFixed(3)})`;
+  ctx.fillText(TR('🌑 ALGO ABISSAL FISGOU SUA LINHA... 🌑'), 480, 512);
+  ctx.globalAlpha = 1;
+}
 
 function drawReel() {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -3861,6 +3984,7 @@ function frame_(now) {
     ctx.fillText('🌙 MARÉ DE SORTE — 2x peixes raros! 🌙', 480, 525);
   }
   ctx.drawImage(vignette, 0, 0);
+  if (reel && reel.rarity === 'abissal') drawAbyssVeil(camX, camY, time); // antes da barrinha: ela fica visível
   if (reel) drawReel();
   if (catchCard) drawCatchCard(now);
   drawConfetti(dt);
