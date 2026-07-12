@@ -3541,46 +3541,48 @@ const abyssCv = document.createElement('canvas');
 abyssCv.width = 960; abyssCv.height = 540;
 const abyssG = abyssCv.getContext('2d');
 
-function drawDarkFlames(hx, hy, hr, time, seed) {
-  const N = 16;
-  for (let i = 0; i < N; i++) {
-    const a = (i / N) * Math.PI * 2 + time * 0.55 * (seed ? -1 : 1);
-    const flick = 0.55 + 0.45 * Math.sin(time * 7 + i * 2.7 + seed * 3.1);
-    const fl = 10 + 10 * flick; // altura da chama
-    const bx = hx + Math.cos(a) * hr, by = hy + Math.sin(a) * hr;
-    const tx = hx + Math.cos(a) * (hr + fl), ty = hy + Math.sin(a) * (hr + fl);
-    const px = -Math.sin(a), py = Math.cos(a); // perpendicular (largura da chama)
-    const w = 5 + 2.5 * flick;
-    ctx.fillStyle = `rgba(14,26,80,${(0.55 + 0.3 * flick).toFixed(3)})`;
+// aura de "ki" negro: ondas circulares de chamas escuras lambendo a borda do círculo
+// (estilo o começo de um despertar — baixas, fluindo em volta, sem cobrir o personagem)
+function drawAbyssAura(hx, hy, hr, time) {
+  const N = 84; // pontos da onda (suave no celular)
+  const layers = [
+    { amp: 20, lobes: 9,  flow: 3.2,  flick: 6.0, color: 'rgba(3,6,18,.88)' },   // chamas negras externas
+    { amp: 12, lobes: 13, flow: -4.2, flick: 7.5, color: 'rgba(14,26,74,.55)' }, // ondulação azul-abissal interna
+  ];
+  for (const L of layers) {
     ctx.beginPath();
-    ctx.moveTo(bx + px * w, by + py * w);
-    ctx.quadraticCurveTo(bx + Math.cos(a) * fl * 0.5 + px * w * 1.25, by + Math.sin(a) * fl * 0.5 + py * w * 1.25, tx, ty);
-    ctx.quadraticCurveTo(bx + Math.cos(a) * fl * 0.5 - px * w * 1.25, by + Math.sin(a) * fl * 0.5 - py * w * 1.25, bx - px * w, by - py * w);
-    ctx.closePath(); ctx.fill();
-    // núcleo azul mais claro dentro da chama
-    ctx.fillStyle = `rgba(60,100,200,${(0.4 * flick).toFixed(3)})`;
-    ctx.beginPath();
-    ctx.moveTo(bx + px * w * 0.45, by + py * w * 0.45);
-    ctx.quadraticCurveTo(bx + Math.cos(a) * fl * 0.35 + px * w * 0.5, by + Math.sin(a) * fl * 0.35 + py * w * 0.5,
-      hx + Math.cos(a) * (hr + fl * 0.62), hy + Math.sin(a) * (hr + fl * 0.62));
-    ctx.quadraticCurveTo(bx + Math.cos(a) * fl * 0.35 - px * w * 0.5, by + Math.sin(a) * fl * 0.35 - py * w * 0.5,
-      bx - px * w * 0.45, by - py * w * 0.45);
-    ctx.closePath(); ctx.fill();
+    for (let i = 0; i <= N; i++) {
+      const a = (i / N) * Math.PI * 2;
+      // cristas de chama viajando ao redor do círculo + tremulação rápida
+      const crest = Math.pow(0.5 + 0.5 * Math.sin(a * L.lobes + time * L.flow), 1.7);
+      const wave = crest * L.amp + Math.sin(a * (L.lobes * 2 + 1) - time * L.flick) * L.amp * 0.22;
+      const r = hr + 1 + wave;
+      const x = hx + Math.cos(a) * r, y = hy + Math.sin(a) * r;
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    }
+    for (let i = N; i >= 0; i--) { // fecha a coroa voltando pela borda interna
+      const a = (i / N) * Math.PI * 2;
+      ctx.lineTo(hx + Math.cos(a) * (hr - 5), hy + Math.sin(a) * (hr - 5));
+    }
+    ctx.closePath();
+    ctx.fillStyle = L.color;
+    ctx.fill();
   }
-  // anel azul-escuro pulsando na borda do círculo
-  ctx.strokeStyle = `rgba(40,70,170,${(0.5 + 0.25 * Math.sin(time * 4 + seed)).toFixed(3)})`;
-  ctx.lineWidth = 2.5;
-  ctx.beginPath(); ctx.arc(hx, hy, hr, 0, 7); ctx.stroke();
+  // respiração azul na borda interna da aura
+  ctx.strokeStyle = `rgba(70,110,220,${(0.38 + 0.24 * Math.sin(time * 4)).toFixed(3)})`;
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(hx, hy, hr - 4, 0, 7); ctx.stroke();
 }
 
 function drawAbyssVeil(camX, camY, time) {
   const fade = Math.min(1, (performance.now() - reel.t0) / 900); // surge suave
-  const pulse = Math.sin(time * 2.6) * 4;
-  const holes = [
-    [(me.x - camX) * ZOOM, (me.y - 8 - camY) * ZOOM, 88 + pulse],
-    [(fish.bobX - camX) * ZOOM, (fish.bobY - camY) * ZOOM, 72 - pulse],
-  ];
-  // camada escura com furos (desenhada num canvas próprio pra recortar só o véu)
+  // UM único círculo de luz englobando pescador + área do peixe
+  const px = me.x, py = me.y - 8;
+  const hx = ((px + fish.bobX) / 2 - camX) * ZOOM;
+  const hy = ((py + fish.bobY) / 2 - camY) * ZOOM;
+  const half = Math.hypot(fish.bobX - px, fish.bobY - py) / 2 * ZOOM;
+  const hr = Math.max(105, Math.min(250, half + 64)) + Math.sin(time * 2.6) * 4;
+  // camada escura com o furo (desenhada num canvas próprio pra recortar só o véu)
   const g = abyssG;
   g.setTransform(1, 0, 0, 1, 0, 0);
   g.globalCompositeOperation = 'source-over';
@@ -3588,20 +3590,17 @@ function drawAbyssVeil(camX, camY, time) {
   g.fillStyle = `rgba(3,8,28,${(0.82 * fade).toFixed(3)})`;
   g.fillRect(0, 0, 960, 540);
   g.globalCompositeOperation = 'destination-out';
-  for (const [hx, hy, hr] of holes) {
-    const rad = g.createRadialGradient(hx, hy, hr * 0.35, hx, hy, hr);
-    rad.addColorStop(0, 'rgba(0,0,0,1)');
-    rad.addColorStop(1, 'rgba(0,0,0,0)');
-    g.fillStyle = rad;
-    g.beginPath(); g.arc(hx, hy, hr, 0, 7); g.fill();
-  }
+  const rad = g.createRadialGradient(hx, hy, hr * 0.45, hx, hy, hr);
+  rad.addColorStop(0, 'rgba(0,0,0,1)');
+  rad.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = rad;
+  g.beginPath(); g.arc(hx, hy, hr, 0, 7); g.fill();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = 1;
   ctx.drawImage(abyssCv, 0, 0);
-  // chamas escuras circulares ao redor de cada círculo de luz
+  // ondas de chamas negras em volta do círculo
   ctx.globalAlpha = fade;
-  drawDarkFlames(holes[0][0], holes[0][1], holes[0][2], time, 0);
-  drawDarkFlames(holes[1][0], holes[1][1], holes[1][2], time, 1);
+  drawAbyssAura(hx, hy, hr, time);
   // aviso sussurrado
   ctx.font = 'bold 15px monospace'; ctx.textAlign = 'center';
   ctx.fillStyle = `rgba(120,60,80,${(0.55 + 0.35 * Math.sin(time * 3)).toFixed(3)})`;
