@@ -137,6 +137,7 @@ const HIDDEN_ROOMS = [WORLD.INTERIOR, ...WORLD.CAVES.map((c) => c.room), WORLD.H
 const HR_MAXX = Math.max(...HIDDEN_ROOMS.map((r) => r.x1));
 const HR_MAXY = Math.max(...HIDDEN_ROOMS.map((r) => r.y1));
 let myRoom = null;
+let houseGroundT = null; // dentro de casa: o "lá fora" vira o terreno da ilha (não mar)
 function roomAtTile(tx, ty) {
   if (tx > HR_MAXX || ty > HR_MAXY) return null;
   for (const r of HIDDEN_ROOMS) if (tx >= r.x0 && tx <= r.x1 && ty >= r.y0 && ty <= r.y1) return r;
@@ -144,8 +145,10 @@ function roomAtTile(tx, ty) {
 }
 const roomAtPx = (x, y) => roomAtTile(Math.floor(x / TILE), Math.floor(y / TILE));
 const rTileAt = (tx, ty) => {
-  if (tx < 0 || ty < 0 || tx >= W || ty >= H) return T.DEEP;
+  if (tx < 0 || ty < 0 || tx >= W || ty >= H) return houseGroundT !== null && myRoom ? houseGroundT : T.DEEP;
   const r = roomAtTile(tx, ty);
+  // dentro de casa, tudo que não é a sala vira o chão da ilha da casa (grama/neve/areia...)
+  if (houseGroundT !== null && myRoom && r !== myRoom) return houseGroundT;
   if (r && r !== myRoom) return T.DEEP;
   return RENDER_MAP[ty * W + tx];
 };
@@ -1226,7 +1229,7 @@ function connect(payload) {
         for (const p of m.players) others.set(p.id, { ...p, tx: p.x, ty: p.y });
         for (const d of m.drops) drops.set(d.id, d);
         housePrice = m.housePrice || housePrice;
-        me.house = null; houseInfo = null;
+        me.house = null; houseInfo = null; houseGroundT = null;
         for (const hh of m.houses || []) applyHouse(hh); // constrói as casas vendidas no mapa local
         document.querySelector('#hud .name').textContent = '🎣 ' + me.name;
         $('login').style.display = 'none';
@@ -1299,16 +1302,19 @@ function connect(payload) {
       case 'house_new':
         applyHouse(m.house);
         break;
-      case 'house_enter':
+      case 'house_enter': {
         me.house = m.owner;
         houseInfo = { owner: m.owner, trophies: m.trophies || [] };
+        const isl2 = ISLANDS.find(i => i.id === m.island);
+        houseGroundT = THEME_GROUND[isl2 ? isl2.theme : 'grass'] ?? T.GRASS; // "lá fora" = terreno da ilha
         me.x = m.x; me.y = m.y; me.boat = false; me.riding = null;
         fish.phase = 'idle';
         sfx.boat();
         if (m.owner !== me.name) toast(LANG === 'en' ? `🏠 Welcome to ${m.owner}'s house!` : `🏠 Bem-vindo à casa de ${m.owner}!`, 3000);
         break;
+      }
       case 'house_exit':
-        me.house = null; houseInfo = null;
+        me.house = null; houseInfo = null; houseGroundT = null;
         me.x = m.x; me.y = m.y;
         fish.phase = 'idle';
         $('trophy').style.display = 'none';
@@ -3908,12 +3914,12 @@ const FURN = (() => {
   const R = WORLD.HOUSE_ROOM;
   const px = (t) => t * TILE;
   return [
-    { y: px(10.6), draw: (x0, y0) => { // cama (canto NO)
-      ctx.fillStyle = '#4a3018'; ctx.fillRect(px(90.9), px(9.4), 34, 48);
-      ctx.fillStyle = '#e8e2d0'; ctx.fillRect(px(90.9) + 3, px(9.4) + 3, 28, 42);
-      ctx.fillStyle = '#fff'; ctx.fillRect(px(90.9) + 5, px(9.4) + 5, 24, 10); // travesseiro
-      ctx.fillStyle = '#b04a4a'; ctx.fillRect(px(90.9) + 3, px(9.4) + 18, 28, 27); // coberta
-      ctx.fillStyle = '#8a3a3a'; ctx.fillRect(px(90.9) + 3, px(9.4) + 18, 28, 4);
+    { y: px(13.4), draw: (x0, y0) => { // cama (lado oeste, abaixo do mostruário)
+      ctx.fillStyle = '#4a3018'; ctx.fillRect(px(90.9), px(10.5), 34, 48);
+      ctx.fillStyle = '#e8e2d0'; ctx.fillRect(px(90.9) + 3, px(10.5) + 3, 28, 42);
+      ctx.fillStyle = '#fff'; ctx.fillRect(px(90.9) + 5, px(10.5) + 5, 24, 10); // travesseiro
+      ctx.fillStyle = '#b04a4a'; ctx.fillRect(px(90.9) + 3, px(10.5) + 18, 28, 27); // coberta
+      ctx.fillStyle = '#8a3a3a'; ctx.fillRect(px(90.9) + 3, px(10.5) + 18, 28, 4);
     } },
     { y: px(13.4), draw: () => { // mesa redonda + 2 banquinhos (lado leste)
       const tx = px(99.6), ty = px(12.8);
@@ -3926,8 +3932,8 @@ const FURN = (() => {
         ctx.fillStyle = '#7a5228'; ctx.beginPath(); ctx.ellipse(tx + ox, ty + 4, 7, 3.5, 0, 0, 7); ctx.fill();
       }
     } },
-    { y: px(9.9), draw: () => { // estante de livros (parede oeste)
-      const sx = px(90.8), sy = px(12.2);
+    { y: px(15.6), draw: () => { // estante de livros (parede oeste, ao sul da cama)
+      const sx = px(90.8), sy = px(13.6);
       ctx.fillStyle = '#3a2a16'; ctx.fillRect(sx, sy, 16, 34);
       ctx.fillStyle = '#5a4224'; ctx.fillRect(sx + 2, sy + 2, 12, 30);
       const cols = ['#c05a4a', '#4a8ac0', '#58a858', '#d0a040', '#9a6ad0'];
@@ -3936,8 +3942,8 @@ const FURN = (() => {
         ctx.fillRect(sx + 3 + b * 3.6, sy + 4 + r2 * 10, 3, 7);
       }
     } },
-    { y: px(9.9), draw: (x0, y0, time) => { // lareira (parede leste) com fogo vivo
-      const fx = px(101.2), fy = px(9.2);
+    { y: px(11.8), draw: (x0, y0, time) => { // lareira (parede leste) com fogo vivo
+      const fx = px(101.2), fy = px(10.3);
       ctx.fillStyle = '#5a5a62'; ctx.fillRect(fx - 12, fy, 24, 22);
       ctx.fillStyle = '#3a3a42'; ctx.fillRect(fx - 9, fy + 6, 18, 16);
       ctx.fillStyle = '#1a1a20'; ctx.fillRect(fx - 7, fy + 8, 14, 12);
@@ -4205,15 +4211,6 @@ function frame_(now) {
       }
     }
 
-    // plaquinha das casas dos jogadores (nome do dono na porta)
-    for (const h of HOUSES) {
-      const L = WORLD.houseLot(h.island, h.lot);
-      const hx2 = L.door.tx * TILE + 8, hy2 = L.door.ty * TILE;
-      if (hx2 < camX - 60 || hx2 > camX + VW + 60 || hy2 < camY - 60 || hy2 > camY + VH + 60) continue;
-      const near = Math.hypot(hx2 - me.x, hy2 - me.y);
-      if (near < 140) drawLabel(hx2, hy2 - 26, '⌂ ' + h.owner, '#ffe9a0');
-      if (near < 42) drawLabel(hx2, hy2 - 36, h.owner === me.name ? TR('[E] entrar') : TR('[E] bater na porta'), '#7affc8');
-    }
     // dentro de uma casa: tapete, capacho e mostruário (embaixo das entidades)
     if (me.house && myRoom) drawHouseInterior(time);
 
@@ -4283,6 +4280,17 @@ function frame_(now) {
         else drawLabel(me.x, me.y - (me.boat ? 38 : 34), showName ? me.name : `Nível ${profile.level}`, showName ? '#bfe8ff' : '#ffd88a');
         if (!rodBehind) drawFishingRodAndLine(me, true, time, now);
       }
+    }
+
+    // plaquinha das casas dos jogadores — DEPOIS das entidades, pra ficar na
+    // frente do telhado (o sprite da casa é alto e cobria o texto)
+    for (const h of HOUSES) {
+      const L = WORLD.houseLot(h.island, h.lot);
+      const hx2 = L.door.tx * TILE + 8, hy2 = (L.door.ty + 1) * TILE;
+      if (hx2 < camX - 60 || hx2 > camX + VW + 60 || hy2 < camY - 60 || hy2 > camY + VH + 60) continue;
+      const near = Math.hypot(hx2 - me.x, hy2 - me.y);
+      if (near < 140) drawLabel(hx2, hy2 + 10, '⌂ ' + h.owner, '#ffe9a0');
+      if (near < 46) drawLabel(hx2, hy2 + 20, h.owner === me.name ? TR('[E] entrar') : TR('[E] bater na porta'), '#7affc8');
     }
 
     // respingos

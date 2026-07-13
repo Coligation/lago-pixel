@@ -49,7 +49,7 @@
     { id: 'vulcana',  name: 'Vulcana',          role: 'quest', island: 'vulcao',  tx: 408, ty: 523 },
     { id: 'brasa',    name: 'Bruno Brasa',      role: 'quest', island: 'vulcao',  tx: 392, ty: 528 },
     { id: 'magda',    name: 'Magda',            role: 'shop',  island: 'vulcao',  tx: 400, ty: 527 },
-    { id: 'marisol',  name: 'Dona Marisol',     role: 'realtor', island: 'vila',  tx: 219, ty: 303 },
+    { id: 'marisol',  name: 'Dona Marisol',     role: 'realtor', island: 'vila',  tx: 214, ty: 307 }, // ao lado da casa-modelo ao sul da estrada do cais
     { id: 'guardiao', name: 'Guardião do Farol', role: 'quest', island: 'farol',  tx: 13,  ty: 11 },
   ];
 
