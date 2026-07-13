@@ -37,7 +37,7 @@ const EN_UI = {
   '🚣 sem barco (compre no Capitão Nereu!)': "🚣 no boat (buy from Captain Nereu!)",
   'nenhuma': 'none', 'Isca: ': 'Bait: ',
   '👑 Você tem o melhor de tudo!': '👑 You own the best of everything!',
-  '🗑️ Tralhas': '🗑️ Junk', 'não capturado': 'not caught yet', 'recorde': 'record',
+  '🗑️ Tralhas': '🗑️ Junk', '✦ Círculos de Evento': '✦ Event Circles', 'não capturado': 'not caught yet', 'recorde': 'record',
   'aperte...': 'press...', ' no balde': ' in the bucket', 'SEGURE ESPAÇO': 'HOLD SPACE',
   'Vender todos os peixes': 'Sell all fish', 'Vender': 'Sell',
   'atrai peixes raros': 'attracts rare fish', 'mordidas mais rápidas': 'faster bites',
@@ -867,12 +867,15 @@ const miniFish = (color, caught, id = 'x') => fishIcon(id, color, caught);
 function refreshDex() {
   const list = $('dexlist');
   list.innerHTML = '';
-  const zoneOrder = ['vila', 'altomar', 'deserto', 'savana', 'gelo', 'vulcao', 'tesouro', '*'];
+  const zoneOrder = ['vila', 'altomar', 'farol', 'deserto', 'savana', 'gelo', 'vulcao', 'tesouro', 'ev', '*'];
   for (const z of zoneOrder) {
-    const pool = catalog.fish.filter(f => z === '*' ? f.zones[0] === '*' : (f.zones[0] !== '*' && f.zones.includes(z)));
+    const pool = catalog.fish.filter(f =>
+      z === '*' ? f.zones[0] === '*'
+      : z === 'ev' ? f.zones[0].startsWith('ev:') // exclusivos dos círculos de evento no mar
+      : (f.zones[0] !== '*' && f.zones.includes(z)));
     if (!pool.length) continue;
     const h = document.createElement('h3');
-    h.textContent = z === '*' ? TR('🗑️ Tralhas') : '📍 ' + ZONE_NAMES[z];
+    h.textContent = z === '*' ? TR('🗑️ Tralhas') : z === 'ev' ? TR('✦ Círculos de Evento') : '📍 ' + ZONE_NAMES[z];
     list.appendChild(h);
     const grid = document.createElement('div');
     grid.className = 'dexgrid';
