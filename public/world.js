@@ -49,6 +49,7 @@
     { id: 'vulcana',  name: 'Vulcana',          role: 'quest', island: 'vulcao',  tx: 408, ty: 523 },
     { id: 'brasa',    name: 'Bruno Brasa',      role: 'quest', island: 'vulcao',  tx: 392, ty: 528 },
     { id: 'magda',    name: 'Magda',            role: 'shop',  island: 'vulcao',  tx: 400, ty: 527 },
+    { id: 'marisol',  name: 'Dona Marisol',     role: 'realtor', island: 'vila',  tx: 219, ty: 303 },
     { id: 'guardiao', name: 'Guardião do Farol', role: 'quest', island: 'farol',  tx: 13,  ty: 11 },
   ];
 
@@ -67,6 +68,63 @@
 
   // assentos dos passageiros nos barcos (deslocamento em px a partir do dono)
   const SEAT_OFF = [[-11, 3], [11, 3], [0, 8], [-14, -2], [14, -2]]; // 5 lugares (o Alvorada leva a galera toda)
+
+  // ------------------------------------------------ bairros residenciais (casas dos jogadores)
+  // âncoras verificadas contra o mapa gerado: área limpa, longe de NPCs/grutas/água.
+  // cada bairro tem 2 fileiras de lotes; a rua de terra vai crescendo a cada casa vendida.
+  const HOUSING = {
+    vila:    { bx: 170, by: 314, cols: 5 }, // 10 lotes
+    gelo:    { bx: 114, by: 123, cols: 5 },
+    deserto: { bx: 606, by: 137, cols: 5 },
+    savana:  { bx: 620, by: 478, cols: 5 },
+    vulcao:  { bx: 396, by: 534, cols: 4 }, // ilha apertada (cratera): 8 lotes
+    // farol de fora de propósito — ilha sagrada do Guardião
+  };
+  const houseLotsOf = (island) => HOUSING[island] ? HOUSING[island].cols * 2 : 0;
+
+  // lote i (0..cols*2-1): fileira de cima primeiro, depois a de baixo
+  function houseLot(island, i) {
+    const d = HOUSING[island];
+    if (!d || i < 0 || i >= d.cols * 2) return null;
+    const row = Math.floor(i / d.cols), k = i % d.cols;
+    const hx = d.bx + k * 7, hy = d.by + row * 8;
+    return { hx, hy, row, k,
+      door: { tx: hx + 2, ty: hy + 3 },
+      front: { tx: hx + 2, ty: hy + 4 },
+      streetY: hy + 5 };
+  }
+
+  // constrói a casa i no mapa: limpa o lote (árvores/pedras somem), ergue a casa
+  // e abre a rua de terra do começo do bairro até a frente do lote.
+  // devolve os tiles limpos (pro cliente tirar a decoração de cima deles).
+  function applyHouseToMap(map, island, i) {
+    const d = HOUSING[island];
+    const L = houseLot(island, i);
+    if (!L) return null;
+    const theme = ISLANDS.find(s => s.id === island).theme;
+    const ground = { grass: T.GRASS, snow: T.SNOW, desert: T.SAND, savanna: T.SAV, volcano: T.VOLC }[theme] || T.GRASS;
+    const cleared = [];
+    const clr = (x, y, t) => {
+      if (x < 0 || y < 0 || x >= W || y >= H) return;
+      map[y * W + x] = t;
+      cleared.push(x, y);
+    };
+    for (let y = L.hy - 1; y <= L.hy + 4; y++) for (let x = L.hx - 1; x <= L.hx + 5; x++) clr(x, y, ground); // lote + quintal
+    for (let x = 0; x < 5; x++) {
+      clr(L.hx + x, L.hy, T.ROOF); clr(L.hx + x, L.hy + 1, T.ROOF);
+      clr(L.hx + x, L.hy + 2, T.WALL); clr(L.hx + x, L.hy + 3, T.WALL);
+    }
+    clr(L.door.tx, L.door.ty, T.DOOR);
+    clr(L.front.tx, L.front.ty, T.PATH); // calçadinha da porta
+    for (let x = d.bx - 2; x <= L.hx + 5; x++) { clr(x, L.streetY, T.PATH); clr(x, L.streetY + 1, T.PATH); } // rua cresce até o lote
+    if (L.row === 1) { // fileira de baixo: conecta as duas ruas na entrada do bairro
+      for (let y = d.by + 5; y <= L.streetY + 1; y++) { clr(d.bx - 2, y, T.PATH); clr(d.bx - 1, y, T.PATH); }
+    }
+    return { lot: L, cleared, ground, theme };
+  }
+
+  // interior compartilhado das casas (uma sala física; cada casa é uma "instância" lógica)
+  const HOUSE_ROOM = { x0: 90, y0: 8, x1: 102, y1: 17, doorTx: 96, doorTy: 17, spawnTx: 96, spawnTy: 15 };
 
   function h2(x, y) {
     let n = (x * 374761393 + y * 668265263) | 0;
@@ -208,6 +266,13 @@
     }
     set(INTERIOR.doorTx, INTERIOR.doorTy, T.DOOR);
 
+    // 5c2) interior das casas dos jogadores (sala de madeira compartilhada, canto NO)
+    for (let y = HOUSE_ROOM.y0; y <= HOUSE_ROOM.y1; y++) for (let x = HOUSE_ROOM.x0; x <= HOUSE_ROOM.x1; x++) {
+      const border = x === HOUSE_ROOM.x0 || x === HOUSE_ROOM.x1 || y === HOUSE_ROOM.y0 || y === HOUSE_ROOM.y1;
+      set(x, y, border ? T.WALL : T.PLANK);
+    }
+    set(HOUSE_ROOM.doorTx, HOUSE_ROOM.doorTy, T.DOOR);
+
     // 5d) grutas secretas: salas + entradas nas ilhas
     const GROUNDOF = (tx, ty) => ({ grass: T.GRASS, snow: T.SNOW, desert: T.SAND, savanna: T.SAV, volcano: T.VOLC, rockisle: T.STONE })[nearestIsland(tx, ty).isl.theme];
     for (const c of CAVES) {
@@ -284,5 +349,7 @@
     return { x, y, moving: k < 1 && (x1 !== x0 || y1 !== y0), dir };
   }
 
-  return { W, H, TILE, T, WALK_OK, BOAT_OK, ISLANDS, NPCS, SPAWN, ZONE_NAMES, INTERIOR, FAROL_DOOR, CAVES, SEAT_OFF, genWorld, zoneAt, nearestIsland, h2, npcWalkables, npcPosAt };
+  return { W, H, TILE, T, WALK_OK, BOAT_OK, ISLANDS, NPCS, SPAWN, ZONE_NAMES, INTERIOR, FAROL_DOOR, CAVES, SEAT_OFF,
+    HOUSING, HOUSE_ROOM, houseLotsOf, houseLot, applyHouseToMap,
+    genWorld, zoneAt, nearestIsland, h2, npcWalkables, npcPosAt };
 });

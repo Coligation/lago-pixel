@@ -384,6 +384,16 @@ const EN_ACHV = {
 const EN_TXT = {
   'Balde cheio! Venda ou solte peixes.': 'Bucket full! Sell or drop some fish.',
   '🔒 Peixe travado! Destrave antes de soltar.': '🔒 Fish locked! Unlock it before dropping.',
+  'Você já tem uma casa! Uma por pescador.': 'You already own a house! One per angler.',
+  'Bairro lotado! Tente outra ilha.': 'Neighborhood full! Try another island.',
+  '🚪 Toc toc... o dono não está no arquipélago agora.': "🚪 Knock knock... the owner isn't in the archipelago right now.",
+  '🚪 Alguém já está batendo nessa porta. Aguarde...': '🚪 Someone is already knocking on that door. Wait...',
+  '🚪 Ninguém atendeu...': '🚪 Nobody answered...',
+  '🚪 Toc toc! Esperando o dono atender...': '🚪 Knock knock! Waiting for the owner to answer...',
+  '🚪 O dono não abriu a porta desta vez.': "🚪 The owner didn't open the door this time.",
+  '🚪 A visita se afastou da porta.': '🚪 The visitor walked away from the door.',
+  'O mostruário está cheio (5 peixes).': 'The display wall is full (5 fish).',
+  'Não jogue peixe no chão de casa! Use o mostruário na parede.': "Don't drop fish on the house floor! Use the display wall.",
   'Balde cheio!': 'Bucket full!',
   'Mire na água!': 'Aim at the water!',
   'Moedas insuficientes!': 'Not enough coins!',
@@ -471,6 +481,54 @@ function checkAchievements(p) {
 const INVENTORY_CAP = 40;
 const BITE_WINDOW_MS = 1500;
 const DROP_TTL_MS = 5 * 60 * 1000;
+
+// ---------------------------------------------------------------- casas dos jogadores
+const HOUSE_PRICE = 1000000;
+const TROPHY_MAX = 5;
+const HOUSES = []; // { owner, island, lot } — reconstruído dos perfis no boot
+const knocks = new Map(); // ownerName -> { guest, timer } (batida pendente na porta)
+
+function registerHouse(owner, island, lot) {
+  HOUSES.push({ owner, island, lot });
+  WORLD.applyHouseToMap(MAP, island, lot); // constrói no mapa do servidor (colisão/posição)
+}
+function rebuildHouses() {
+  HOUSES.length = 0;
+  for (const [name, p] of Object.entries(profiles)) {
+    if (p.house && WORLD.houseLot(p.house.island, p.house.lot)) registerHouse(name, p.house.island, p.house.lot);
+  }
+  if (HOUSES.length) console.log(`🏠 ${HOUSES.length} casa(s) construída(s) no mapa.`);
+}
+const soldOn = (island) => HOUSES.filter(h => h.island === island).length;
+const houseOf = (owner) => HOUSES.find(h => h.owner === owner);
+
+// perfil de alguém pelo nome: se estiver online usa o da sessão VIVA — nunca
+// getProfile num jogador online (recriaria o objeto e desconectaria o save dele)
+function profOf(name) {
+  const live = [...players.values()].find(q => q.name === name);
+  return live ? live.profile : getProfile(name);
+}
+
+function enterHouse(p, h) {
+  const R = WORLD.HOUSE_ROOM, TL = WORLD.TILE;
+  p.inHouse = h.owner;
+  p.x = R.spawnTx * TL + 8; p.y = R.spawnTy * TL + 8;
+  clearFishing(p); p.boat = false;
+  const hp = profOf(h.owner).house;
+  send(p.ws, 'house_enter', { owner: h.owner, island: h.island, trophies: hp ? hp.trophies : [], x: p.x, y: p.y });
+  broadcast('player_state', { player: publicState(p) }, p.ws);
+}
+
+function houseInfoUpdate(owner) { // todos dentro da casa veem a parede mudar na hora
+  const hp = profOf(owner).house;
+  if (!hp) return;
+  for (const q of players.values()) if (q.inHouse === owner) send(q.ws, 'house_info', { owner, trophies: hp.trophies });
+}
+
+function clearKnockFor(name) { // dono saiu / visita desistiu
+  const entry = knocks.get(name);
+  if (entry) { clearTimeout(entry.timer); knocks.delete(name); }
+}
 
 // ---------------------------------------------------------------- dia/noite + evento de sorte
 
@@ -672,6 +730,11 @@ function getProfile(name) {
     lastX: Number.isFinite(p.lastX) ? p.lastX : null,
     lastY: Number.isFinite(p.lastY) ? p.lastY : null,
     lastDir: ['up', 'down', 'left', 'right'].includes(p.lastDir) ? p.lastDir : null,
+    // casa própria: ilha + lote + peixes pendurados no mostruário
+    house: (p.house && WORLD.houseLot(p.house.island, p.house.lot))
+      ? { island: p.house.island, lot: p.house.lot,
+          trophies: (Array.isArray(p.house.trophies) ? p.house.trophies : []).filter(f => f && FISH_BY_ID[f.fishId]).slice(0, TROPHY_MAX) }
+      : null,
     // rastro de presença (pro painel /admin)
     firstSeen: p.firstSeen || null,
     lastSeen: p.lastSeen || null,
@@ -843,7 +906,7 @@ function publicState(p) {
   return { id: p.id, name: p.name, x: Math.round(p.x), y: Math.round(p.y), dir: p.dir,
     moving: p.moving, boat: p.boat, level: p.profile.level,
     rodT: p.profile.rod, lineT: p.profile.line, boatT: p.profile.boat, hue: p.profile.color, // equipamento e cor visíveis
-    riding: p.riding || null, seat: p.seat || 0,
+    riding: p.riding || null, seat: p.seat || 0, house: p.inHouse || null,
     fishing: p.fishing ? p.fishing.phase : null, bobX: p.bobX, bobY: p.bobY };
 }
 
@@ -884,7 +947,7 @@ function profileView(p) {
     rod: pr.rod, line: pr.line, boat: pr.boat, baits: pr.baits, activeBait: pr.activeBait,
     rods: pr.rods, lines: pr.lines, boats: pr.boats,
     inventory: pr.inventory, dex: pr.dex, quests: pr.quests, achv: pr.achv, color: pr.color,
-    totalCaught: pr.totalCaught, bestCatch: pr.bestCatch };
+    house: pr.house, totalCaught: pr.totalCaught, bestCatch: pr.bestCatch };
 }
 
 function gainXp(p, amount) {
@@ -951,7 +1014,7 @@ setInterval(() => {
 // checkpoint: sessão em andamento vai sendo gravada — nem reinício do servidor perde
 // último ponto seguro do jogador: sem barco alheio, dentro do mapa, em terra andável
 function snapshotPos(p) {
-  if (p.riding) return; // no barco do outro — a posição pertence ao dono
+  if (p.riding || p.inHouse) return; // no barco do outro / dentro de casa — não persiste ali
   const px = Math.round(p.x), py = Math.round(p.y);
   if (!WORLD.WALK_OK.has(tileAt(px, py))) return; // barco na água: também não persiste
   p.profile.lastX = px; p.profile.lastY = py; p.profile.lastDir = p.dir;
@@ -1047,6 +1110,7 @@ wss.on('connection', (ws) => {
         x: player.x, y: player.y, dir: player.dir,
         players: [...players.values()].filter(p => p !== player).map(publicState),
         drops: [...drops.values()],
+        houses: HOUSES, housePrice: HOUSE_PRICE,
         timeOffset, dayLen: DAY_LEN, event: luckEvent, zones: zonesView(),
         catalog: CATALOGS[L],
       });
@@ -1236,6 +1300,17 @@ wss.on('connection', (ws) => {
         if (!npc) break;
         const npcPos = WORLD.npcPosAt(NPC_SPOTS[npc.id], npc, Date.now());
         if (Math.hypot(npcPos.x - player.x, npcPos.y - player.y) > 6 * WORLD.TILE) break;
+        if (npc.role === 'realtor') { // 🏠 Dona Marisol — imobiliária do arquipélago
+          const lg2 = langOf(player);
+          send(ws, 'open_housing', {
+            price: HOUSE_PRICE,
+            owned: pr.house ? { island: pr.house.island, lot: pr.house.lot } : null,
+            islands: Object.keys(WORLD.HOUSING).map(id => ({
+              id, name: lg2 === 'en' ? (EN_ZONE[id] || id) : WORLD.ZONE_NAMES[id],
+              sold: soldOn(id), total: WORLD.houseLotsOf(id) })),
+          });
+          break;
+        }
         if (npc.role === 'shop' || npc.role === 'boatshop') {
           const s = SHOPS[npc.id];
           if (!s) break;
@@ -1318,9 +1393,121 @@ wss.on('connection', (ws) => {
         break;
       }
 
+      case 'buy_house': {
+        const island = String(msg.island || '');
+        if (!WORLD.HOUSING[island]) break;
+        const lg2 = langOf(player);
+        if (pr.house) { send(ws, 'toast', { text: trp(player, 'Você já tem uma casa! Uma por pescador.') }); break; }
+        const lot = soldOn(island);
+        if (lot >= WORLD.houseLotsOf(island)) { send(ws, 'toast', { text: trp(player, 'Bairro lotado! Tente outra ilha.') }); break; }
+        if (pr.coins < HOUSE_PRICE) { send(ws, 'toast', { text: trp(player, 'Moedas insuficientes!') }); break; }
+        pr.coins -= HOUSE_PRICE;
+        pr.house = { island, lot, trophies: [] };
+        registerHouse(player.name, island, lot);
+        saveDirty = true;
+        broadcast('house_new', { house: { owner: player.name, island, lot } }); // todos veem a rua abrir
+        send(ws, 'bought', { you: profileView(player) });
+        send(ws, 'dialog', { npc: 'Dona Marisol', text: lg2 === 'en'
+          ? `🏠 CONGRATULATIONS, homeowner! Yours is house #${lot + 1} in the ${EN_ZONE[island] || island} district. The street is already open and the key is yours — press USE at your door to walk in!`
+          : `🏠 PARABÉNS, proprietário! A sua é a casa nº ${lot + 1} do bairro de ${WORLD.ZONE_NAMES[island]}. A rua já está aberta e a chave é sua — aperte USAR na porta pra entrar!` });
+        announceAll((l2) => l2 === 'en'
+          ? `🏠 ${player.name} bought a house in ${EN_ZONE[island] || island}!`
+          : `🏠 ${player.name} comprou uma casa própria em ${WORLD.ZONE_NAMES[island]}!`, 'lendario', ws);
+        break;
+      }
+
+      case 'house_door': {
+        const TL = WORLD.TILE;
+        if (player.inHouse) { // sair: volta pra frente da porta da casa
+          const h = houseOf(player.inHouse);
+          const L = h ? WORLD.houseLot(h.island, h.lot) : null;
+          player.inHouse = null;
+          player.x = L ? L.door.tx * TL + 8 : WORLD.SPAWN.x;
+          player.y = L ? (L.door.ty + 1) * TL + 12 : WORLD.SPAWN.y;
+          clearFishing(player); player.boat = false;
+          send(ws, 'house_exit', { x: player.x, y: player.y });
+          broadcast('player_state', { player: publicState(player) }, ws);
+          break;
+        }
+        // qual casa tem a porta por perto?
+        let target = null;
+        for (const h of HOUSES) {
+          const L = WORLD.houseLot(h.island, h.lot);
+          if (Math.hypot(L.door.tx * TL + 8 - player.x, L.door.ty * TL + 8 - player.y) < 3 * TL) { target = h; break; }
+        }
+        if (!target) break;
+        if (target.owner === player.name) { enterHouse(player, target); break; }
+        // visita: bate na porta e espera o dono autorizar
+        const owner = [...players.values()].find(q => q.name === target.owner);
+        if (!owner) { send(ws, 'toast', { text: trp(player, '🚪 Toc toc... o dono não está no arquipélago agora.') }); break; }
+        if (knocks.has(target.owner)) { send(ws, 'toast', { text: trp(player, '🚪 Alguém já está batendo nessa porta. Aguarde...') }); break; }
+        const entry = {
+          guest: player.name,
+          timer: setTimeout(() => {
+            knocks.delete(target.owner);
+            if (ws.readyState === 1) send(ws, 'toast', { text: trp(player, '🚪 Ninguém atendeu...') });
+            if (owner.ws.readyState === 1) send(owner.ws, 'knock_end', {});
+          }, 25000),
+        };
+        knocks.set(target.owner, entry);
+        send(owner.ws, 'knock', { guest: player.name });
+        send(ws, 'toast', { text: trp(player, '🚪 Toc toc! Esperando o dono atender...') }, );
+        break;
+      }
+
+      case 'knock_reply': { // dono respondeu o popup (allow: true/false)
+        const entry = knocks.get(player.name);
+        if (!entry) break;
+        clearTimeout(entry.timer);
+        knocks.delete(player.name);
+        const guest = [...players.values()].find(q => q.name === entry.guest);
+        if (!guest || guest.inHouse) break;
+        if (!msg.allow) {
+          send(guest.ws, 'toast', { text: trp(guest, '🚪 O dono não abriu a porta desta vez.') });
+          break;
+        }
+        const h = houseOf(player.name);
+        if (!h) break;
+        const L = WORLD.houseLot(h.island, h.lot);
+        if (Math.hypot(L.door.tx * WORLD.TILE + 8 - guest.x, L.door.ty * WORLD.TILE + 8 - guest.y) > 6 * WORLD.TILE) {
+          send(ws, 'toast', { text: trp(player, '🚪 A visita se afastou da porta.') });
+          break;
+        }
+        enterHouse(guest, h);
+        send(ws, 'toast', { text: langOf(player) === 'en' ? `🏠 ${guest.name} came in!` : `🏠 ${guest.name} entrou na sua casa!` });
+        break;
+      }
+
+      case 'trophy_add': { // pendura um peixe do balde no mostruário (parede norte)
+        if (player.inHouse !== player.name || !pr.house) break;
+        const i = Number(msg.index);
+        if (!(i >= 0 && i < pr.inventory.length)) break;
+        if (pr.house.trophies.length >= TROPHY_MAX) { send(ws, 'toast', { text: trp(player, 'O mostruário está cheio (5 peixes).') }); break; }
+        const [f] = pr.inventory.splice(i, 1);
+        pr.house.trophies.push(f);
+        saveDirty = true;
+        send(ws, 'bought', { you: profileView(player) });
+        houseInfoUpdate(player.name);
+        break;
+      }
+
+      case 'trophy_take': { // tira da parede de volta pro balde
+        if (player.inHouse !== player.name || !pr.house) break;
+        const i = Number(msg.slot);
+        if (!(i >= 0 && i < pr.house.trophies.length)) break;
+        if (pr.inventory.length >= INVENTORY_CAP) { send(ws, 'toast', { text: trp(player, 'Balde cheio!') }); break; }
+        const [f] = pr.house.trophies.splice(i, 1);
+        pr.inventory.push(f);
+        saveDirty = true;
+        send(ws, 'bought', { you: profileView(player) });
+        houseInfoUpdate(player.name);
+        break;
+      }
+
       case 'drop': {
         const i = Number(msg.index);
         if (!(i >= 0 && i < pr.inventory.length)) break;
+        if (player.inHouse) { send(ws, 'toast', { text: trp(player, 'Não jogue peixe no chão de casa! Use o mostruário na parede.') }); break; }
         if (pr.inventory[i].locked) { send(ws, 'toast', { text: trp(player, '🔒 Peixe travado! Destrave antes de soltar.') }); break; }
         const [fish] = pr.inventory.splice(i, 1);
         const drop = { id: nextDropId++, fish, x: Math.round(player.x), y: Math.round(player.y), by: player.name, t: Date.now() };
@@ -1517,6 +1704,13 @@ wss.on('connection', (ws) => {
       if (player.sessEntry) player.sessEntry.out = now;
       snapshotPos(player); // guarda onde parou pro próximo login
       dropRiders(player); // se era dono de barco com passageiros
+      clearKnockFor(player.name); // batida pendente na porta dele morre junto
+      for (const [own, e] of knocks) { // e se ele era a visita esperando, também
+        if (e.guest === player.name) { clearTimeout(e.timer); knocks.delete(own);
+          const o = [...players.values()].find(q => q.name === own);
+          if (o) send(o.ws, 'knock_end', {});
+        }
+      }
       clearFishing(player);
       players.delete(ws);
       saveDirty = true;
@@ -1537,6 +1731,7 @@ process.on('SIGTERM', shutdown);
 
 (async () => {
   await ghLoad(); // restaura os saves ANTES de aceitar jogadores
+  rebuildHouses(); // ergue as casas compradas no mapa
   httpServer.listen(PORT, () => console.log(`🎣 Lago Pixel v2 em http://localhost:${PORT}`));
 })();
 
